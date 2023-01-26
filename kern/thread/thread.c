@@ -175,6 +175,7 @@ cpu_create(unsigned hardware_number)
 	c->c_self = c;
 	c->c_hardware_number = hardware_number;
 
+	/* curthread points the thread that is currently running */
 	c->c_curthread = NULL;
 	threadlist_init(&c->c_zombies);
 	c->c_hardclocks = 0;

@@ -234,6 +234,7 @@ cvtestthread(void *junk, unsigned long num)
 		lock_acquire(testlock);
 		while (testval1 != num) {
 			gettime(&ts1);
+			KASSERT(lock_do_i_hold(testlock));
 			cv_wait(testcv, testlock);
 			gettime(&ts2);
 
