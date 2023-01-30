@@ -53,6 +53,7 @@ SRCS+=$(KTOP)/lib/kprintf.c
 SRCS+=$(KTOP)/lib/misc.c
 SRCS+=$(KTOP)/lib/time.c
 SRCS+=$(KTOP)/lib/uio.c
+SRCS+=$(KTOP)/main/hello.c
 SRCS+=$(KTOP)/main/main.c
 SRCS+=$(KTOP)/main/menu.c
 SRCS.MACHINE.mips+=$(KTOP)/arch/mips/locore/trap.c

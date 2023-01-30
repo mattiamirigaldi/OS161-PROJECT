@@ -38,6 +38,7 @@
 #include <lib.h>
 #include <spl.h>
 #include <clock.h>
+#include <hello.h>
 #include <thread.h>
 #include <proc.h>
 #include <current.h>
@@ -209,7 +210,7 @@ void
 kmain(char *arguments)
 {
 	boot();
-
+	//hello();
 	menu(arguments);
 
 	/* Should not get here */
