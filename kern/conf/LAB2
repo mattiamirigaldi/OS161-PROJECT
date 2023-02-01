@@ -1,14 +1,11 @@
 # Kernel config file using dumbvm.
 # This should be used until you have your own VM system.
-#
-# This config builds with optimization for performance testing.
-#
 
 include conf/conf.kern		# get definitions of available options
 
-#debug				# Optimizing compile (no debug).
-#debugonly
-options noasserts		# Disable assertions.
+debug				# Compile with debug info and -Og.
+#debugonly			# Compile with debug info only (no -Og).
+#options hangman 		# Deadlock detection. (off by default)
 
 #
 # Device drivers for hardware.
@@ -35,3 +32,4 @@ options sfs			# Always use the file system
 #options netfs			# You might write this as a project.
 
 options dumbvm			# Chewing gum and baling wire.
+options syscalls		# read and write std

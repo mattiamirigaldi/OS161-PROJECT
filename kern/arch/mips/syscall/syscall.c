@@ -110,7 +110,26 @@ syscall(struct trapframe *tf)
 		break;
 
 	    /* Add stuff here */
-
+//SE syscall write e read ci sono
+#if OPT_SYSCALLS
+	case SYS_write:
+		retval=sys_write((int)tf->tf_a0,
+			(userptr_t)tf->tf_a1,
+                        (size_t)tf->tf_a2);
+                if (retval<0) err= ENOSYS;
+                else err=0;
+        break;
+	case SYS_read:
+		retval=sys_read((int)tf->tf_a0,
+                        (userptr_t)tf->tf_a1,
+                        (size_t)tf->tf_a2);
+		if (retval<0) err= ENOSYS;
+		else err=0;
+	break;
+	case SYS_exit:
+                sys_exit((int)tf->tf_a0); //AVOID PANIC
+	break;
+#endif
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;
