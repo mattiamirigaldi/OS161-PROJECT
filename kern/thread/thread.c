@@ -782,16 +782,20 @@ thread_exit(void)
 	struct thread *cur;
 
 	cur = curthread;
-
+	#if OPT_WAITPID
+	KASSERT(cur->t_proc == NULL);
+	proc_remthread(cur);
+	#else
 	/*
 	 * Detach from our process. You might need to move this action
 	 * around, depending on how your wait/exit works.
 	 */
+	
 	proc_remthread(cur);
 
 	/* Make sure we *are* detached (move this only if you're sure!) */
 	KASSERT(cur->t_proc == NULL);
-
+	#endif
 	/* Check the stack guard band. */
 	thread_checkstack(cur);
 

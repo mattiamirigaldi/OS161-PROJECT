@@ -116,6 +116,7 @@ common_prog(int nargs, char **args)
 {
 	struct proc *proc;
 	int result;
+	int exit_code;
 
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
@@ -127,6 +128,12 @@ common_prog(int nargs, char **args)
 			proc /* new process */,
 			cmd_progthread /* thread function */,
 			args /* thread arg */, nargs /* thread arg */);
+	
+	exit_code =proc_wait(proc);
+	if (exit_code) {
+		kprintf("return code: %d\n", exit_code);
+		return exit_code ;
+	}
 	if (result) {
 		kprintf("thread_fork failed: %s\n", strerror(result));
 		proc_destroy(proc);
@@ -137,7 +144,9 @@ common_prog(int nargs, char **args)
 	 * The new process will be destroyed when the program exits...
 	 * once you write the code for handling that.
 	 */
-
+	//wait end of child process with this code CLAUDIA
+	
+	
 	return 0;
 }
 

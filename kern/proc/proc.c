@@ -48,11 +48,36 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
+#include <synch.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
+
+
+
+/*FUNCTIONS TO CREATE AND DESTROY PROC WITH SEMAPHORE AND WAITPI*/
+static void
+proc_init_waitpid(struct proc *proc, const char *name) {
+#if opt_waitpid
+  proc->p_semaphore = sem_create(name, 0);
+#else
+  (void)proc;
+  (void)name;
+#endif
+}
+
+static void
+proc_end_waitpid(struct proc *proc) {
+#if opt_waitpid
+  sem_destroy(proc->p_semaphore);
+#else
+  (void)proc;
+#endif
+}
+
+
 
 /*
  * Create a proc structure.
@@ -62,7 +87,7 @@ struct proc *
 proc_create(const char *name)
 {
 	struct proc *proc;
-
+	
 	proc = kmalloc(sizeof(*proc));
 	if (proc == NULL) {
 		return NULL;
@@ -81,6 +106,9 @@ proc_create(const char *name)
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
+	
+	/*proc wait pid field*/
+	proc_init_waitpid(proc, name); //psem field
 
 	return proc;
 }
@@ -165,8 +193,12 @@ proc_destroy(struct proc *proc)
 		as_destroy(as);
 	}
 
-	KASSERT(proc->p_numthreads == 0);
+	KASSERT(proc->p_numthreads == 0); 
+	//it means no thread active, included rmthread
 	spinlock_cleanup(&proc->p_lock);
+
+	//proc end wait pid
+	proc_end_waitpid(proc); //psem field
 
 	kfree(proc->p_name);
 	kfree(proc);
@@ -318,3 +350,22 @@ proc_setas(struct addrspace *newas)
 	spinlock_release(&proc->p_lock);
 	return oldas;
 }
+int proc_wait(struct proc *p){
+	#if opt_waitpid
+	KASSERT(proc != NULL);
+	KASSERT(proc != kproc);
+	int status_wait;
+	
+	//wait(); sem or cv
+	P(proc->p_semaphore); // SEMAPHORE
+	//get exit status, destroy user process
+	status_wait =proc->proc_status;
+	proc_destroy(proc);
+	return status_wait;
+	#else
+	//no semaphore waiting
+	(void)proc;
+	return 0;
+	#endif
+}
+

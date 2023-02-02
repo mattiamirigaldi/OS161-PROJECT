@@ -129,6 +129,12 @@ syscall(struct trapframe *tf)
         sys__exit((int)tf->tf_a0); //AVOID PANIC
 		err=0; //sennò errore error: 'err' may be used uninitialized in this function
 	break;
+	case SYS_waitpid:
+        sys_waitpid((pid_t)tf->tf_a0,
+                        (userptr_t)tf->tf_a1,
+                        (int)tf->tf_a2);
+		if (retval<0) err= ENOSYS;
+		else err=0;break;
 #endif
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
