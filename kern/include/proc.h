@@ -75,9 +75,10 @@ struct proc {
 	struct vnode *p_cwd;		/* current working directory */
 
 	/* add more material here as needed */
-	if opt_waitpid
-	struct sempahore *p_semaphore; //semaforo for proc wait e sys_exit
+	#if opt_waitpid
+	struct semaphore *p_semaphore; //semaforo for proc wait e sys_exit
 	int p_status; //stato di ritono dopo sys_exit
+	pid_t p_pid; //pid del processo
 	#endif
 
 };
@@ -109,6 +110,7 @@ struct addrspace *proc_setas(struct addrspace *);
 
 // wait pid functions
 int proc_wait(struct proc *p);
-static void proc_end_waitpid(struct proc *proc);
-static void proc_init_waitpid(struct proc *proc, const char *name) 
+struct proc * from_pid_to_proc(pid_t pid);
+//static void proc_end_waitpid(struct proc *proc);
+//static void proc_init_waitpid(struct proc *proc, const char *name) ;
 #endif /* _PROC_H_ */

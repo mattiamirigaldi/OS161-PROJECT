@@ -65,6 +65,7 @@ int sys_read(int filehandle, userptr_t buf, size_t size);
 int sys_write(int filehandle, userptr_t buf, size_t size);
 void sys__exit(int status);
 int sys_waitpid (pid_t pid, userptr_t returncode, int flags); 	
+pid_t sys_getpid(void);
 #endif
 
 #endif /* _SYSCALL_H_ */

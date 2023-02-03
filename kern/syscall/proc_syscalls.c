@@ -16,6 +16,7 @@
 #include <addrspace.h>
 #include <synch.h>
 #include <current.h> //curthread, curproc
+#include <limits.h>
 
 
 /*
@@ -62,6 +63,29 @@ int
 sys_waitpid(pid_t pid, userptr_t returncode, int flags)
 {
   #if opt_waitpid
+/*
+kern/include/kern/limits.h
+__PID_MIN       2
+__PID_MAX       32767
+kern/include/limits.h : 
+PID_MIN, PID_MAX 
+make a table: IN PROC.C (pid, *proc). new proc new line, removed proc removed line
+*/
+  struct proc *pr;
+  int status_pr;
+/*DA METTERE IN PROC.C PERCHE TABLE DEFINITA LI, STATIC
+  KASSERT(pid>=0 && pid< MAX_PROC+1);
+  pr=processTable.proc[pid];
+  KASSERT(pr->p_pid==pid);
+*/
+  pr=from_pid_to_proc(pid);
+  if (pr==NULL) return -1;
+
+  (void)flags; // TO HANDLE
+  status_pr=proc_wait(pr);
+  if (returncode!=NULL) *(int*)returncode= status_pr;
+  
+  return (int)pid;
   #else
   (void)flags;
   (void)pid;
@@ -69,3 +93,19 @@ sys_waitpid(pid_t pid, userptr_t returncode, int flags)
   return -1;
 #endif
 }
+
+//TEST WAITPID WITH testbin/forktest, BUT GETPID NEEDED FOR TEST
+pid_t 
+sys_getpid(void){
+  #if opt_waitpid
+    KASSERT(curproc!=NULL);
+    struct proc *pro= curproc;
+    pid_t pid=pro->p_pid;
+  return pid;
+  #else
+  return -1;
+#endif
+}
+
+/*FORK: clonare intero addr space of parent process to child, and start it*/
+//int sys_fork(void){};

@@ -55,13 +55,55 @@
  */
 struct proc *kproc;
 
+#define MAX_PROC 100
+
+//max proc can be defined as PID_MAX and 
+//the start of the table (i) can be initialized as PID_MIN
+//proc_pid maximum should be PID_MAX - PID_MIN
+static struct _processTable {
+  struct proc *proc[MAX_PROC+1]; /* [0] not used. pids are >= 1 */
+  int proc_pid;          /* index of last allocated pid */
+  struct spinlock lk;	/* Lock for this table */
+} processTable;
+
+struct  proc *
+from_pid_to_proc(pid_t pid){
+	struct proc* pr;
+	#if opt_waitpid
+		KASSERT(pid>=0 && pid< MAX_PROC+1);
+		pr=processTable.proc[pid];
+		KASSERT(pr->p_pid==pid);
+	return pr;
+	#else
+		(void)pid;
+		return NULL;
+	#endif
+};
 
 
 /*FUNCTIONS TO CREATE AND DESTROY PROC WITH SEMAPHORE AND WAITPI*/
 static void
 proc_init_waitpid(struct proc *proc, const char *name) {
 #if opt_waitpid
-  proc->p_semaphore = sem_create(name, 0);
+	int totalpids;
+
+   spinlock_acquire(&processTable.lk);
+   	totalpids=processTable.proc_pid;
+	proc->p_pid=0;
+	if (MAX_PROC<totalpids+1) totalpids=0; //circular table, restart from 1 (no zero)
+   	for(int i=1;i<totalpids+2;i++){
+		if(processTable.proc[i]==NULL){
+			processTable.proc[i] = proc;
+			processTable.proc_pid+=1;
+			proc->p_pid=i;
+			break;	
+			}
+		}
+	//continua finchè non c'è un proc nullo
+	spinlock_release(&processTable.lk);
+	if (proc->p_pid==0) panic ("PIDs table full. Terminate some process\n");
+	proc->p_status=0;
+  	proc->p_semaphore = sem_create(name, 0);
 #else
   (void)proc;
   (void)name;
@@ -71,12 +113,19 @@ proc_init_waitpid(struct proc *proc, const char *name) {
 static void
 proc_end_waitpid(struct proc *proc) {
 #if opt_waitpid
+
+   spinlock_acquire(&processTable.lk);
+   int pid_to_remove = (int) proc->p_pid;
+   KASSERT(pid_to_remove>0 && pid_to_remove <= MAX_PROC+1);
+   processTable.proc[pid_to_remove]=NULL;
+   processTable.proc_pid-=1;
+   spinlock_release(&processTable.lk);
+
   sem_destroy(proc->p_semaphore);
 #else
   (void)proc;
 #endif
 }
-
 
 
 /*
@@ -351,6 +400,7 @@ proc_setas(struct addrspace *newas)
 	return oldas;
 }
 int proc_wait(struct proc *p){
+	struct proc *proc=p;
 	#if opt_waitpid
 	KASSERT(proc != NULL);
 	KASSERT(proc != kproc);
@@ -359,7 +409,7 @@ int proc_wait(struct proc *p){
 	//wait(); sem or cv
 	P(proc->p_semaphore); // SEMAPHORE
 	//get exit status, destroy user process
-	status_wait =proc->proc_status;
+	status_wait =proc->p_status;
 	proc_destroy(proc);
 	return status_wait;
 	#else
