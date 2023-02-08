@@ -141,6 +141,20 @@ syscall(struct trapframe *tf)
 		if (retval<0) err= ENOSYS;
 		else err=0;
 	break;
+	#if OPT_FILE
+		case SYS_open:
+			retval=sys_open(int)tf->tf_a0,
+				(userptr_t)tf->tf_a1, (mode_t)tf->tf_a2);
+			//if (retval<0) err= ENOSYS;
+			//else err=0;
+		break;
+		case SYS_close:
+			retval=sys_close(int)tf->tf_a0);
+			if (retval<0) err= ENOMEM;
+			//else err=0;
+		break;
+
+	#endif
 #endif
 	    default:
 		kprintf("Unknown syscall %d\n", callno);

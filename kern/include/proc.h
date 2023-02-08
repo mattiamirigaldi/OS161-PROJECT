@@ -38,6 +38,7 @@
 
 #include <spinlock.h>
 #include "opt-waitpid.h"
+#include "opt-file.h"
 
 struct addrspace;
 struct thread;
@@ -111,6 +112,8 @@ struct addrspace *proc_setas(struct addrspace *);
 // wait pid functions
 int proc_wait(struct proc *p);
 struct proc * from_pid_to_proc(pid_t pid);
+#if OPT_FILE
+#endif
 //static void proc_end_waitpid(struct proc *proc);
 //static void proc_init_waitpid(struct proc *proc, const char *name) ;
 #endif /* _PROC_H_ */

@@ -33,6 +33,7 @@
 
 #include <cdefs.h> /* for __DEAD */
 #include "opt-syscalls.h" //for read-write function on std
+#include "opt-file.h"
 struct trapframe; /* from <machine/trapframe.h> */
 
 /*
@@ -62,10 +63,14 @@ int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 
 #if OPT_SYSCALLS
 int sys_read(int filehandle, userptr_t buf, size_t size);
-int sys_write(int filehandle, userptr_t buf, size_t size);
+int sys_write(int filehandle);
 void sys__exit(int status);
 int sys_waitpid (pid_t pid, userptr_t returncode, int flags); 	
 pid_t sys_getpid(void);
+#if OPT_FILE
+int sys_open(int filehandle, userptr_t buf, mode_t mode);
+int sys_close(int filehandle);
+#endif
 #endif
 
 #endif /* _SYSCALL_H_ */

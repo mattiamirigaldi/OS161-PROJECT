@@ -48,24 +48,27 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
-#include <synch.h>
+#include <syscall.h>
+
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
-
+#if OPT_WAITPID
 #define MAX_PROC 100
-
+#include <synch.h>
 //max proc can be defined as PID_MAX and 
 //the start of the table (i) can be initialized as PID_MIN
 //proc_pid maximum should be PID_MAX - PID_MIN
 static struct _processTable {
+  int active;
   struct proc *proc[MAX_PROC+1]; /* [0] not used. pids are >= 1 */
   int proc_pid;          /* index of last allocated pid */
   struct spinlock lk;	/* Lock for this table */
 } processTable;
 
+#endif
 struct  proc *
 from_pid_to_proc(pid_t pid){
 	struct proc* pr;
@@ -158,6 +161,10 @@ proc_create(const char *name)
 	
 	/*proc wait pid field*/
 	proc_init_waitpid(proc, name); //psem field
+
+	#if OPT_FILE
+	
+	#endif
 
 	return proc;
 }
@@ -263,6 +270,10 @@ proc_bootstrap(void)
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");
 	}
+	#if OPT_WAITPID
+	spinlock_init(&processTable.lk);
+	processTable.active=1;
+	#endif
 }
 
 /*
