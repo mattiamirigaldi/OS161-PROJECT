@@ -88,6 +88,7 @@ main(int argc, char *argv[])
 	if (rv<0) {
 		err(1, "%s: read", file);
 	}
+	printf("read %s \n", readbuf);
 	rv = close(fd);
 	if (rv<0) {
 		err(1, "%s: close (2nd time)", file);
@@ -95,6 +96,7 @@ main(int argc, char *argv[])
 	/* ensure null termination */
 	readbuf[40] = 0;
 
+	printf("Written - %s - while read - %s -\n", writebuf, readbuf); 
 	if (strcmp(readbuf, writebuf)) {
 		errx(1, "Buffer data mismatch!");
 	}

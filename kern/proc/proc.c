@@ -48,6 +48,77 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
+#include <synch.h>
+
+
+/*  
+ *  pid table implemented with a vector
+ *  where the index corresponds to pid
+ *  while the cell content is the pointer to proc
+ */
+#define MAX_RUNNING_PROC 250
+static struct _proc_pidTable
+{
+  int last_pid;
+  struct proc* proc[MAX_RUNNING_PROC];  // pid table
+  struct spinlock pid_lk;               // to protect pid table
+} proc_pidTable;
+
+  
+/*
+ * Search if a pid is available in pidTable and assign it to proc, if not panic
+ */
+static void proc_pid_alloc(struct proc* proc)
+{
+  int i;
+  spinlock_acquire(&proc_pidTable.pid_lk);
+  i = proc_pidTable.last_pid+1;
+  proc->p_pid = 0;
+  // pid=0 used for special case
+  if( i > MAX_RUNNING_PROC ) i=1;
+  // circular search
+  while( i != proc_pidTable.last_pid ){
+    if( proc_pidTable.proc[i] == NULL ){
+      proc->p_pid = i; 
+      proc_pidTable.proc[i] = proc;
+      proc_pidTable.last_pid = i;
+      break;
+    }
+    i++;
+    if( i > MAX_RUNNING_PROC ) i=1;
+  }
+  spinlock_release(&proc_pidTable.pid_lk);
+  if (proc->p_pid == 0){
+    panic("Process pid table is full, too many running processes\n");
+  } 
+}
+
+
+/*
+ * Free the pid cell in proc_pidTable
+ */
+static void proc_free_pid(pid_t pid)
+{
+  KASSERT( pid != 0 && pid < MAX_RUNNING_PROC);
+  spinlock_acquire(&proc_pidTable.pid_lk);
+  proc_pidTable.proc[pid] = NULL;
+  spinlock_release(&proc_pidTable.pid_lk);
+}
+
+/*
+ * Return the proc associated to passed pid
+ */
+
+struct proc* proc_search_pid(pid_t pid)
+{
+  struct proc* found_proc;
+  KASSERT( pid!=0 && pid<MAX_RUNNING_PROC );
+  spinlock_acquire(&proc_pidTable.pid_lk);
+  found_proc = proc_pidTable.proc[pid];
+  spinlock_release(&proc_pidTable.pid_lk);
+  return found_proc;
+}
+
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -75,13 +146,20 @@ proc_create(const char *name)
 
 	proc->p_numthreads = 0;
 	spinlock_init(&proc->p_lock);
-
+	
 	/* VM fields */
 	proc->p_addrspace = NULL;
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
+	proc_pid_alloc(proc);
+	proc->p_sem = sem_create(name, 0);
+	proc-> p_status = 0;
+
+	/* allocated and initialized to 0 fd_table */
+	bzero(proc->p_fdtable,OPEN_MAX*sizeof(struct fdesc*));
+	
 	return proc;
 }
 
@@ -168,6 +246,10 @@ proc_destroy(struct proc *proc)
 	KASSERT(proc->p_numthreads == 0);
 	spinlock_cleanup(&proc->p_lock);
 
+	proc_free_pid(proc->p_pid);
+	sem_destroy(proc->p_sem);
+	
+	//kfree(&(proc->p_status)); --> PERCHÈ non si fa ?
 	kfree(proc->p_name);
 	kfree(proc);
 }
@@ -264,7 +346,7 @@ proc_remthread(struct thread *t)
 	int spl;
 
 	proc = t->t_proc;
-	KASSERT(proc != NULL);
+	if ( proc == NULL ) return; 
 
 	spinlock_acquire(&proc->p_lock);
 	KASSERT(proc->p_numthreads > 0);
@@ -318,3 +400,49 @@ proc_setas(struct addrspace *newas)
 	spinlock_release(&proc->p_lock);
 	return oldas;
 }
+
+/*
+ * Wait the process passed as argument terminates, return the proc exit status 
+ */
+
+int proc_wait(struct proc* proc)
+{
+  KASSERT( proc != NULL);
+  int proc_status;
+  /* Waiting that process signals is exiting */ 
+  P(proc->p_sem);
+  proc_status = proc->p_status;
+  proc_destroy(proc);
+  return proc_status;
+
+}
+
+/* 
+ * funcion to copy the fd table from a proc source to a proc dest 
+ * and increase reference count of the file desc
+ */
+
+int proc_copy_fdtable(struct proc* p_dest, struct proc* p_source)
+{
+  if( p_source == NULL || p_dest == NULL ) return -1; 
+  struct fdesc* f;
+  for(int i=0; i<OPEN_MAX; i++ ) {
+    f = p_source->p_fdtable[i];
+    p_dest->p_fdtable[i] = f;
+    if (f != NULL) f->file_refcount++;
+  }
+  return 0;
+}
+
+int proc_file_alloc(struct fdesc* fopen)
+{
+  KASSERT( fopen != NULL);
+  for(int fd=STDERR_FILENO+1; fd<OPEN_MAX; fd++){
+    if(curproc->p_fdtable[fd] == NULL){
+      curproc->p_fdtable[fd] = fopen;
+      return fd;
+    }
+  }
+  return -1;
+}
+  

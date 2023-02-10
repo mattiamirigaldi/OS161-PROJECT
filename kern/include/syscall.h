@@ -59,4 +59,17 @@ __DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,
 int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 
+/* Prototypes for process management system calls */
+void sys__exit(int status);
+int sys_waitpid (pid_t pid, userptr_t status, int options);
+pid_t sys_getpid(void);
+int sys_fork(struct trapframe* tf, pid_t* retval);
+
+/* Prototypes for file system calls*/
+int sys_open(userptr_t fpath, int openflags, mode_t mode, int* errp);
+int sys_close(int fd);
+int sys_write(int fd, userptr_t buf_ptr, size_t buf_length);
+int sys_read(int fd, userptr_t buf_ptr, size_t buf_length);
+
+
 #endif /* _SYSCALL_H_ */

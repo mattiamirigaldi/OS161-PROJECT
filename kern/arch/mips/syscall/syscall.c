@@ -78,44 +78,93 @@
 void
 syscall(struct trapframe *tf)
 {
-	int callno;
-	int32_t retval;
-	int err;
+  int callno;
+  int32_t retval;
+  int err;
 
-	KASSERT(curthread != NULL);
-	KASSERT(curthread->t_curspl == 0);
-	KASSERT(curthread->t_iplhigh_count == 0);
+  KASSERT(curthread != NULL);
+  KASSERT(curthread->t_curspl == 0);
+  KASSERT(curthread->t_iplhigh_count == 0);
 
-	callno = tf->tf_v0;
+  callno = tf->tf_v0;
 
-	/*
-	 * Initialize retval to 0. Many of the system calls don't
-	 * really return a value, just 0 for success and -1 on
-	 * error. Since retval is the value returned on success,
-	 * initialize it to 0 by default; thus it's not necessary to
-	 * deal with it except for calls that return other values,
-	 * like write.
-	 */
+  /*
+   * Initialize retval to 0. Many of the system calls don't
+   * really return a value, just 0 for success and -1 on
+   * error. Since retval is the value returned on success,
+   * initialize it to 0 by default; thus it's not necessary to
+   * deal with it except for calls that return other values,
+   * like write.
+   */
 
-	retval = 0;
+  retval = 0;
 
-	switch (callno) {
-	    case SYS_reboot:
-		err = sys_reboot(tf->tf_a0);
-		break;
+  switch (callno) {
+    case SYS_reboot:
+      err = sys_reboot(tf->tf_a0);
+      break;
 
-	    case SYS___time:
-		err = sys___time((userptr_t)tf->tf_a0,
-				 (userptr_t)tf->tf_a1);
-		break;
-
+    case SYS___time:
+      err = sys___time((userptr_t)tf->tf_a0,
+		       (userptr_t)tf->tf_a1);
+      break;
+    case SYS__exit:
+      sys__exit(tf->tf_a0);
+      err = 0;
+      break;
+      
+      // FILE system calls
+    case SYS_open:
+      retval = sys_open((userptr_t)tf->tf_a0,
+			tf->tf_a1,
+			(mode_t) tf->tf_a2,
+			&err);
+      if (retval<0) err = ENOSYS;
+      else err=0;
+      break;
+    case SYS_close:
+      retval = sys_close(tf->tf_a0);
+      if (retval<0) err = ENOENT;
+      else err = 0;
+      break;
+    case SYS_write:
+      retval = sys_write(tf->tf_a0,
+			 (userptr_t)tf->tf_a1,
+			 (size_t)tf->tf_a2);
+      if(retval<0) err = ENOSYS;
+      else err = 0;
+      break;
+    case SYS_read:
+      retval = sys_read(tf->tf_a0,
+			(userptr_t)tf->tf_a1,
+			(size_t)tf->tf_a2);
+      if(retval<0) err = ENOSYS;
+      else err = 0;
+      break;
+    case SYS_waitpid:
+      retval = sys_waitpid( (pid_t)tf->tf_a0,
+			    (userptr_t)tf->tf_a1,
+			    (int)tf->tf_a2);     
+      if(retval<0) err = ENOSYS;
+      else err = 0;
+      break;
+    case SYS_getpid:
+      retval = sys_getpid();
+      if(retval<0) err = ENOSYS;
+      else err = 0;
+      break;
+    case SYS_fork:
+      err = sys_fork(tf, &retval);
+      break;
+	    
+	      
 	    /* Add stuff here */
 
-	    default:
-		kprintf("Unknown syscall %d\n", callno);
-		err = ENOSYS;
-		break;
-	}
+    default:
+      kprintf("Unknown syscall %d\n", callno);
+      err = ENOSYS;
+      break;
+  }
 
 
 	if (err) {

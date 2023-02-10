@@ -37,10 +37,23 @@
  */
 
 #include <spinlock.h>
+#include <synch.h>
+#include <limits.h>
+#include <kern/unistd.h>
 
 struct addrspace;
 struct thread;
 struct vnode;
+
+/*
+ * File descriptor structure 
+ */
+struct fdesc {
+  char* file_name;                   /* Used for debugging */
+  off_t file_offset;                 
+  unsigned int file_refcount;        /* count how many process are referencing the file */
+  struct vnode* file_v;                     /* pointer to actual vnode file */
+};
 
 /*
  * Process structure.
@@ -60,17 +73,21 @@ struct vnode;
  * without sleeping.
  */
 struct proc {
-	char *p_name;			/* Name of this process */
-	struct spinlock p_lock;		/* Lock for this structure */
-	unsigned p_numthreads;		/* Number of threads in this process */
+  char *p_name;			        /* Name of this process */
+  struct spinlock p_lock;	        /* Lock for this structure */
+  unsigned p_numthreads;	        /* Number of threads in this process */
 
-	/* VM */
-	struct addrspace *p_addrspace;	/* virtual address space */
+  /* VM */
+  struct addrspace *p_addrspace;	/* virtual address space */
 
-	/* VFS */
-	struct vnode *p_cwd;		/* current working directory */
+  /* VFS */
+  struct vnode *p_cwd;		        /* current working directory */
 
-	/* add more material here as needed */
+  struct semaphore * p_sem;             /* semaphore to protect exit status */
+  int p_status;                         /* exit status */
+  pid_t p_pid;                          /* process identifier */
+  
+  struct fdesc* p_fdtable[OPEN_MAX];    /* Vector of open files pointers */      
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
@@ -97,5 +114,16 @@ struct addrspace *proc_getas(void);
 /* Change the address space of the current process, and return the old one. */
 struct addrspace *proc_setas(struct addrspace *);
 
+/* Wait that process passed terminates */
+int proc_wait(struct proc* proc);
+
+/* Return process associated to passed pid */
+struct proc* proc_search_pid(pid_t pid);
+
+/* Copy fdtable content from p_dest into process p_source */
+int proc_copy_fdtable(struct proc* p_dest, struct proc* p_source);
+
+/* Search a free slot in fdtable of process and if found allocate it to fopen */
+int proc_file_alloc(struct fdesc* fopen);
 
 #endif /* _PROC_H_ */
