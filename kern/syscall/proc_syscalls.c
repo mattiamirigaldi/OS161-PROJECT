@@ -7,6 +7,7 @@
 
 #include <types.h>
 #include <kern/unistd.h>
+#include <kern/errno.h> //fork errors
 #include <clock.h>
 #include <copyinout.h>
 #include <syscall.h>
@@ -15,8 +16,22 @@
 #include <thread.h>
 #include <addrspace.h>
 #include <synch.h>
+#include <mips/trapframe.h>
 #include <current.h> //curthread, curproc
 #include <limits.h>
+
+
+
+//if static voi no cite on file.h
+#if OPT_FORK
+static void 
+enter_forked_process_syscall(void *tf_pass,unsigned long neces){
+  struct trapframe *ctf= (struct trapframe *)tf_pass;
+  (void)neces; //useless variable, to respect args of thread fork
+  enter_forked_process(ctf);
+panic("no return should be considered after entering fork\n");
+}
+#endif
 
 
 /*
@@ -35,11 +50,11 @@ sys__exit(int status)
   //signal(..) sem or cv TO PROC_WAIT
   #if opt_waitpid
   //include current
-  struct thread *cur=curthread;
+  
   struct proc *p =curproc;
 
 	p->p_status =status &0xFF; //8LSB status
-  proc_remthread(cur); //remove thread --> 
+  proc_remthread(curthread); //remove thread --> 
   //-->on thread exit use this case ad detached thread, not always
 
   V(p->p_semaphore);
@@ -108,4 +123,56 @@ sys_getpid(void){
 }
 
 /*FORK: clonare intero addr space of parent process to child, and start it*/
-//int sys_fork(void){};
+//int sys_fork(trapframe, retval){};
+#if OPT_FORK
+
+int 
+sys_fork(struct trapframe *ctf, pid_t *retval){
+  struct thread *cur=curthread;
+  struct trapframe *c_tf;
+  struct proc *c_proc;
+  int res_fork;
+
+  KASSERT(curproc!=NULL);
+
+  //new process creation
+  c_proc=proc_create_runprogram(curproc->p_name);
+  if(c_proc==NULL) return ENOMEM;
+
+  
+  //duplicate addr space (cp cur addr space to new addr space)
+  as_copy(curproc->p_addrspace,&(c_proc->p_addrspace));
+  if(c_proc->p_addrspace) return ENOMEM;
+  //parent trapframe copy (child trapframe creation)
+  c_tf=kmalloc(sizeof(struct trapframe)); //allocate space
+  if (c_tf==NULL){
+  proc_destroy(c_proc);
+  return ENOMEM;
+  }
+  memcpy(c_tf, ctf, sizeof(struct trapframe));//copy
+
+  /*link to child:
+ * Create a new thread based on an existing one.
+ * The new thread has name NAME, and starts executing in function
+ * ENTRYPOINT. DATA1 and DATA2 are passed to ENTRYPOINT.
+ *
+ * The new thread is created in the process P. If P is null, the
+ * process is inherited from the caller. It will start on the same CPU
+ * as the caller, unless the scheduler intervenes first.
+
+  //int thread_fork(const char *name, struct proc *proc, void (*func)(void *, unsigned long),void *data1, unsigned long data2);
+  */
+
+  res_fork= thread_fork(cur->t_name, c_proc,enter_forked_process_syscall,c_tf, (unsigned long)0);
+  //if PARENT return destroy process and free trapframe OF CHILD
+  if (res_fork){
+    proc_destroy(c_proc);
+    kfree(c_tf);
+    return ENOMEM;
+
+  }
+  //ritorna il child pid
+  *retval =c_proc->p_pid;
+  return 0;
+}
+#endif

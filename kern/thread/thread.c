@@ -783,8 +783,9 @@ thread_exit(void)
 
 	cur = curthread;
 	#if OPT_WAITPID
-	KASSERT(cur->t_proc == NULL);
 	proc_remthread(cur);
+	KASSERT(cur->t_proc == NULL);
+	
 	#else
 	/*
 	 * Detach from our process. You might need to move this action

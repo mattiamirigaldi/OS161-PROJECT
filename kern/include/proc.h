@@ -37,6 +37,7 @@
  */
 
 #include <spinlock.h>
+#include <limits.h>
 #include "opt-waitpid.h"
 #include "opt-file.h"
 
@@ -80,6 +81,9 @@ struct proc {
 	struct semaphore *p_semaphore; //semaforo for proc wait e sys_exit
 	int p_status; //stato di ritono dopo sys_exit
 	pid_t p_pid; //pid del processo
+	#endif
+	#if OPT_FILE
+		struct openfile *fileTable[OPEN_MAX];
 	#endif
 
 };

@@ -163,7 +163,7 @@ proc_create(const char *name)
 	proc_init_waitpid(proc, name); //psem field
 
 	#if OPT_FILE
-	
+		bzero(proc->fileTable,OPEN_MAX*sizeof(struct openfile *));
 	#endif
 
 	return proc;
@@ -356,8 +356,8 @@ proc_remthread(struct thread *t)
 	int spl;
 
 	proc = t->t_proc;
-	KASSERT(proc != NULL);
-
+	//KASSERT(proc != NULL);
+	if (proc == NULL) return;
 	spinlock_acquire(&proc->p_lock);
 	KASSERT(proc->p_numthreads > 0);
 	proc->p_numthreads--;

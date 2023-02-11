@@ -34,4 +34,5 @@ options sfs			# Always use the file system
 options dumbvm			# Chewing gum and baling wire.
 options syscalls		# read and write std
 options waitpid
+options fork
 options file

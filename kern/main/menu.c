@@ -129,11 +129,8 @@ common_prog(int nargs, char **args)
 			cmd_progthread /* thread function */,
 			args /* thread arg */, nargs /* thread arg */);
 	
-	exit_code =proc_wait(proc);
-	if (exit_code) {
-		kprintf("return code: %d\n", exit_code);
-		return exit_code ;
-	}
+	
+
 	if (result) {
 		kprintf("thread_fork failed: %s\n", strerror(result));
 		proc_destroy(proc);
@@ -145,7 +142,11 @@ common_prog(int nargs, char **args)
 	 * once you write the code for handling that.
 	 */
 	//wait end of child process with this code CLAUDIA
-	
+	exit_code =proc_wait(proc);
+	if (exit_code) {
+		kprintf("return code: %d\n", exit_code);
+		return exit_code ;
+	}
 	
 	return 0;
 }
