@@ -20,6 +20,7 @@
 #include <mips/trapframe.h>
 #include <current.h> //curthread, curproc
 #include <limits.h>
+#include <kern/wait.h> //waitpid options ERRORS
 
 
 
@@ -91,6 +92,7 @@ int
 sys_waitpid(pid_t pid, userptr_t returncode, int flags)
 {
   #if OPT_WAITPID
+
 /*
 kern/include/kern/limits.h
 __PID_MIN       2
@@ -106,12 +108,40 @@ make a table: IN PROC.C (pid, *proc). new proc new line, removed proc removed li
   pr=processTable.proc[pid];
   KASSERT(pr->p_pid==pid);
 */
-  pr=from_pid_to_proc(pid);
-  if (pr==NULL) return -1;
 
+//INITIAL CHECKS FOR WAITPID BADCALLS
+
+    //invalid pointers:
+    if (returncode==NULL) return -1;
+
+    if(returncode == (int*) 0x40000000 || returncode == (int*) 0x80000000 || ((int)returncode & 3) != 0) {
+      return -1;
+    }
+    //invalid options:
+    if(flags != 0 &&  flags != WNOHANG && flags != WUNTRACED){
+      return -1;
+    }
+    //pid number invalid: we can choose also PID>0&&PID<=MAX_PID
+    //defined in function "from pid to proc"
+    if(pid < PID_MIN || pid > PID_MAX) {
+      return -1;
+    }
+   
+  pr=from_pid_to_proc(pid);
+
+  //null process pointed by pid
+  if (pr==NULL) return -1;
+    //NOT HANDLED: ONLY PARENTS CAN CHECK FOR THEIR CHILD PID
+   //if(curproc->pid != parent_pid del pid  ){return -1; }
+
+  
+  //if (returncode==INVAL_PTR) return -1;
+  //kprintf("porcatroia\n");
   (void)flags; // TO HANDLE
   status_pr=proc_wait(pr);
-  if (returncode!=NULL) *(int*)returncode= status_pr;
+  if (returncode!=NULL) {
+    *(int*)returncode= status_pr;}
+  else return -1;
   return (int)pid;
 
   #else
@@ -205,3 +235,8 @@ sys_fork(struct trapframe *ctf, pid_t *retval){
   return res_fork;
 }
 #endif
+
+int 
+sys_execv (char* program, char **args){
+
+}

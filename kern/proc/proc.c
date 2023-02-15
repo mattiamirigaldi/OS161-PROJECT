@@ -75,7 +75,8 @@ struct  proc *
 from_pid_to_proc(pid_t pid){
 	struct proc* pr;
 	#if OPT_WAITPID
-		if(!(pid>=0 && pid<(MAX_PROC+1))) return NULL;
+		//if(!(pid>=0 && pid<(MAX_PROC+1))) return NULL;
+		if(!(pid>0 && pid<(MAX_PROC+1))) return NULL;
 		//KASSERT(pid>=0 && pid<MAX_PROC);
 		pr=processTable.proc[pid];
 		KASSERT(pr->p_pid==pid);

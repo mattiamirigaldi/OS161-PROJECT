@@ -76,6 +76,7 @@ int sys_close(int filehandle);
 #endif
 #if OPT_FORK
 int sys_fork(struct trapframe *ctf, pid_t *retval);
+int sys_execv (char* program, char **args);
 #endif
 #endif
 

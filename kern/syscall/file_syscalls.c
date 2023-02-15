@@ -176,8 +176,10 @@ int sys_open(int openflags, userptr_t path, mode_t mode, int *err){
   struct openfile *of=NULL;
   int result;
   int i, fd;
-
-  result = vfs_open((char *)path, openflags, mode, &vn);
+  char *console=NULL;
+  console= kstrdup((char *)path);
+  result = vfs_open(console, openflags, mode, &vn);
+  kfree(console);
   if (result) {
     *err= ENOENT;
     return -1;
