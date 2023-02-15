@@ -73,6 +73,7 @@ int sys_read(int fd, userptr_t buf_ptr, size_t buf_length);
 int sys_dup2( int oldfd, int newfd, int* errp);
 off_t sys_lseek(int fd, off_t pos, int whence, int *errp);
 int sys_chdir(char *path_usr, int *errp);
+int sys___getcwd(char *buf, size_t buflen, int *errp);
 int fd_console_init(void);
 
 

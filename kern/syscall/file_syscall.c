@@ -356,6 +356,9 @@ sys_lseek(int fd, off_t pos, int whence, int *errp)
   return new_position;
 }
 
+/*
+ * Syscal to change process directory
+ */
 
 int
 sys_chdir(char *path_usr, int *errp)
@@ -380,6 +383,50 @@ sys_chdir(char *path_usr, int *errp)
 
   kfree(path_kern);
   return 0;
+}
+
+
+/*
+ * Syscall that return process current directory
+ */
+int
+sys___getcwd(char *buf, size_t buflen, int *errp)
+{
+  struct uio cwd_uio;
+  struct iovec cwd_iovec;
+  int residual, returned; 
+  if (buf == NULL) {
+    *errp = EFAULT;
+    return -1;
+  }
+  if (buflen <= 0) {
+    *errp = EINVAL;
+    return -1;
+  }
+    
+  /* data and length */
+  cwd_iovec.iov_ubase = (void *)buf;
+  cwd_iovec.iov_len = buflen;
+
+  /* flags and references */
+  cwd_uio.uio_iovcnt = 1;
+  cwd_uio.uio_iov = &cwd_iovec;
+  cwd_uio.uio_segflg = UIO_USERSPACE;
+  cwd_uio.uio_rw = UIO_READ;
+  cwd_uio.uio_space = curproc->p_addrspace;
+  cwd_uio.uio_resid = buflen;
+
+  residual = cwd_uio.uio_resid;
+  returned = vfs_getcwd(&cwd_uio);
+
+  if (returned) {
+    *errp = returned;
+    return -1;
+  }
+
+  residual -= cwd_uio.uio_resid;
+
+  return residual;
 }
 
 

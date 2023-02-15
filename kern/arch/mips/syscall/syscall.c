@@ -164,7 +164,13 @@ syscall(struct trapframe *tf)
 			  &err);
       if (retval == 0) err = 0;
       break;
-      
+    case SYS___getcwd:
+      retval = sys___getcwd((char*) tf->tf_a0,
+			    (size_t) tf->tf_a1,
+			    &err);
+      if (retval<0) err = ENOSYS;
+      else err = 0;
+      break;
     // Process management syscall
     case SYS_waitpid:
       retval = sys_waitpid( (pid_t)tf->tf_a0,
