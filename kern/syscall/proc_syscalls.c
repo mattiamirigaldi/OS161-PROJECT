@@ -21,6 +21,7 @@
 #include <current.h> //curthread, curproc
 #include <limits.h>
 #include <kern/wait.h> //waitpid options ERRORS
+#include <kern/fcntl.h> //file constant modes rwoc
 
 
 
@@ -237,6 +238,103 @@ sys_fork(struct trapframe *ctf, pid_t *retval){
 #endif
 
 int 
-sys_execv (char* program, char **args){
+sys_execv (char* progr, char **args){
+  struct addrspace* new_as=NULL;
+  struct addrspace* old_as;
+  struct vnode *v_exe;
+  int res_executable, res_k2u;
+  vaddr_t entrypoint, stackptr;
+  int args_counter;
 
+  //CHECK PASSED PARAMETERS
+    //invalid arguments
+   if(args==NULL || (int*)args== (int*) 0x40000000 || (int*)args== (int*) 0x80000000 ) {
+      return -1;
+    }
+  if (progr==NULL) return -1;
+
+  KASSERT(proc_getas() != NULL);
+
+//copy args from usr space to kernel buf:
+/////////////////////////////////////////////
+//char **args: pointers to usr space string--> not defined number of args
+//for each pointer: cp strings with copyin until NULL
+
+
+
+/*
+1- args count
+
+*/
+//mips: pointers alignment by 4
+
+
+////////////////////////////////
+  //AS RUNPROGRAM: open executable, create new addr space, load elf
+  //open exe file
+	res_executable = vfs_open(progr, O_RDONLY, 0, &v_exe);
+	if (res_executable) {
+//-->>>>>>>>>>>    //free copy! of progr kern buf
+		return res_executable;
+	}
+
+
+
+
+//-->>>>>>>>>>> destroy current addr space
+
+
+
+
+
+
+	/* We should be a new process. */
+	KASSERT(proc_getas() == NULL);
+
+	/* Create a new address space. */
+	new_as = as_create();
+	if (new_as == NULL) {
+//-->>>>>>>>>>>    //free copy! of progr kern buf
+		vfs_close(v_exe);
+		return ENOMEM;
+	}
+
+	/* Switch to it and activate it. */
+	proc_setas(new_as);
+	as_activate();
+
+	/* Load the executable. */
+	res_executable = load_elf(v_exe, &entrypoint);
+	if (res_executable) {
+		/* p_addrspace will go away when curproc is destroyed */
+ //-->>>>>>>>>>>    //free copy! of progr kern buf
+		vfs_close(v_exe);
+		return res_executable;
+	}
+
+  //close file: done 
+  vfs_close(v_exe);
+  /////////////////////////////////////////////
+  res_k2u = as_define_stack(new_as, &stackptr);
+	if (res_k2u) {
+		/* p_addrspace will go away when curproc is destroyed */
+		return res_k2u;
+	}
+
+
+ //cp args from kern buff to usr space: USE USER STACK space, the only known
+  //as_define_stack: user stack, aka USER_SPACE_TOP
+
+  /////////////////////////////////
+  
+  
+  //AS RUNPROGRAM: run user mode, use function "enter new proc"
+  /* Warp to user mode. */
+	enter_new_process(args_BOHHHH/*argc*/, stackptr /*userspace addr of argv*/,
+			  stackptr /*userspace addr of environment*/, (userptr_t)
+			  stackptr, entrypoint);
+
+	/* enter_new_process does not return. */
+	panic("enter_new_process returned\n");
+	return EINVAL;
 }
