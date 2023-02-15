@@ -33,8 +33,8 @@
 
 #include <cdefs.h> /* for __DEAD */
 #include "opt-syscalls.h" //for read-write function on std
-#include "opt-file.h"
 #include "opt-fork.h"
+#include "opt-file.h"
 
 struct trapframe; /* from <machine/trapframe.h> */
 
@@ -50,6 +50,7 @@ void syscall(struct trapframe *tf);
 
 /* Helper for fork(). You write this. */
 void enter_forked_process(struct trapframe *tf);
+void enter_forked_process_syscall(void *tf_pass,unsigned long data2);
 
 /* Enter user mode. Does not return. */
 __DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,

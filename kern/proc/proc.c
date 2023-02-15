@@ -55,6 +55,8 @@
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
+
+
 #if OPT_WAITPID
 #define MAX_PROC 100
 #include <synch.h>
@@ -72,8 +74,9 @@ static struct _processTable {
 struct  proc *
 from_pid_to_proc(pid_t pid){
 	struct proc* pr;
-	#if opt_waitpid
-		KASSERT(pid>=0 && pid< MAX_PROC+1);
+	#if OPT_WAITPID
+		if(!(pid>=0 && pid<(MAX_PROC+1))) return NULL;
+		//KASSERT(pid>=0 && pid<MAX_PROC);
 		pr=processTable.proc[pid];
 		KASSERT(pr->p_pid==pid);
 	return pr;
@@ -87,12 +90,24 @@ from_pid_to_proc(pid_t pid){
 /*FUNCTIONS TO CREATE AND DESTROY PROC WITH SEMAPHORE AND WAITPI*/
 static void
 proc_init_waitpid(struct proc *proc, const char *name) {
-#if opt_waitpid
+#if OPT_WAITPID
 	int totalpids;
-
-   spinlock_acquire(&processTable.lk);
+   	spinlock_acquire(&processTable.lk);
    	totalpids=processTable.proc_pid;
+	/*totalpids=processTable.proc_pid+1;
 	proc->p_pid=0;
+	if (totalpids>MAX_PROC) totalpids=1; //circular table, restart from 1 (no zero)
+   	while(totalpids!=processTable.proc_pid){
+		if(processTable.proc[totalpids]==NULL){
+			processTable.proc[totalpids] = proc;
+			processTable.proc_pid=totalpids;
+			proc->p_pid=totalpids;
+			break;	
+		}
+			totalpids++;
+			if(totalpids>MAX_PROC) totalpids=1;
+	}
+	*/
 	if (MAX_PROC<totalpids+1) totalpids=0; //circular table, restart from 1 (no zero)
    	for(int i=1;i<totalpids+2;i++){
 		if(processTable.proc[i]==NULL){
@@ -102,6 +117,7 @@ proc_init_waitpid(struct proc *proc, const char *name) {
 			break;	
 			}
 		}
+	
 	//continua finchè non c'è un proc nullo
 	spinlock_release(&processTable.lk);
 	if (proc->p_pid==0) panic ("PIDs table full. Terminate some process\n");
@@ -115,16 +131,17 @@ proc_init_waitpid(struct proc *proc, const char *name) {
 
 static void
 proc_end_waitpid(struct proc *proc) {
-#if opt_waitpid
-
+#if OPT_WAITPID
+	int pid_to_remove;
    spinlock_acquire(&processTable.lk);
-   int pid_to_remove = (int) proc->p_pid;
-   KASSERT(pid_to_remove>0 && pid_to_remove <= MAX_PROC+1);
+   pid_to_remove = (int) proc->p_pid;
+   KASSERT(pid_to_remove>0 && pid_to_remove <= (MAX_PROC+1));
+   //KASSERT(pid_to_remove>0 && pid_to_remove <= MAX_PROC);
    processTable.proc[pid_to_remove]=NULL;
    processTable.proc_pid-=1;
    spinlock_release(&processTable.lk);
-
   sem_destroy(proc->p_semaphore);
+  //kprintf("prov\n");
 #else
   (void)proc;
 #endif
@@ -412,7 +429,7 @@ proc_setas(struct addrspace *newas)
 }
 int proc_wait(struct proc *p){
 	struct proc *proc=p;
-	#if opt_waitpid
+	#if OPT_WAITPID
 	KASSERT(proc != NULL);
 	KASSERT(proc != kproc);
 	int status_wait;
@@ -422,6 +439,8 @@ int proc_wait(struct proc *p){
 	//get exit status, destroy user process
 	status_wait =proc->p_status;
 	proc_destroy(proc);
+	//kprintf("ma ci arriva qui?\n");
+	//kprintf("ma status? %d\n", status_wait);
 	return status_wait;
 	#else
 	//no semaphore waiting

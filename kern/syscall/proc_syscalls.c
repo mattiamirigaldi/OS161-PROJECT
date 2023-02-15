@@ -7,6 +7,7 @@
 
 #include <types.h>
 #include <kern/unistd.h>
+
 #include <kern/errno.h> //fork errors
 #include <clock.h>
 #include <copyinout.h>
@@ -24,12 +25,26 @@
 
 //if static voi no cite on file.h
 #if OPT_FORK
-static void 
-enter_forked_process_syscall(void *tf_pass,unsigned long neces){
-  struct trapframe *ctf= (struct trapframe *)tf_pass;
-  (void)neces; //useless variable, to respect args of thread fork
-  enter_forked_process(ctf);
-panic("no return should be considered after entering fork\n");
+void 
+enter_forked_process_syscall(void *tf_pass,unsigned long data2){
+	//trapframe saving in stack
+	struct trapframe *c_tf = (struct trapframe*) tf_pass; //kernel stack trapframe copy
+	struct trapframe store_tf;
+  struct addrspace *c_addr= (struct addrspace*) data2;
+	
+	c_tf->tf_v0=0; //0 return
+	c_tf->tf_a3=0; //success
+	c_tf->tf_epc += 4;
+
+	memcpy(&store_tf, c_tf, sizeof(struct trapframe));
+	kfree(c_tf);
+	c_tf=NULL;
+
+	curproc->p_addrspace=c_addr;
+	as_activate();
+	mips_usermode(&store_tf);
+
+  panic("no return should be considered after entering fork\n");
 }
 #endif
 
@@ -48,7 +63,7 @@ sys__exit(int status)
   kill process by yourself by remthread calling*/
   
   //signal(..) sem or cv TO PROC_WAIT
-  #if opt_waitpid
+  #if OPT_WAITPID
   //include current
   
   struct proc *p =curproc;
@@ -56,9 +71,7 @@ sys__exit(int status)
 	p->p_status =status &0xFF; //8LSB status
   proc_remthread(curthread); //remove thread --> 
   //-->on thread exit use this case ad detached thread, not always
-
-  V(p->p_semaphore);
-  
+  V(p->p_semaphore);  
   //return status_wait when signal arrives
   //DON'T NEED TO DESTROY PROC HERE BECAUSE IT IS DONE BY
   //PASSING TO PROC WAIT (it has inside proc destroy)
@@ -77,7 +90,7 @@ sys__exit(int status)
 int
 sys_waitpid(pid_t pid, userptr_t returncode, int flags)
 {
-  #if opt_waitpid
+  #if OPT_WAITPID
 /*
 kern/include/kern/limits.h
 __PID_MIN       2
@@ -99,20 +112,20 @@ make a table: IN PROC.C (pid, *proc). new proc new line, removed proc removed li
   (void)flags; // TO HANDLE
   status_pr=proc_wait(pr);
   if (returncode!=NULL) *(int*)returncode= status_pr;
-  
   return (int)pid;
+
   #else
   (void)flags;
   (void)pid;
   (void)returncode;
   return -1;
-#endif
+  #endif
 }
 
 //TEST WAITPID WITH testbin/forktest, BUT GETPID NEEDED FOR TEST
 pid_t 
 sys_getpid(void){
-  #if opt_waitpid
+  #if OPT_WAITPID
     KASSERT(curproc!=NULL);
     struct proc *pro= curproc;
     pid_t pid=pro->p_pid;
@@ -129,27 +142,43 @@ sys_getpid(void){
 int 
 sys_fork(struct trapframe *ctf, pid_t *retval){
   struct thread *cur=curthread;
-  struct trapframe *c_tf;
-  struct proc *c_proc;
+  struct trapframe *c_tf=NULL;
+  struct proc *c_proc=NULL;
+  struct addrspace* c_addr=NULL;
   int res_fork;
 
-  KASSERT(curproc!=NULL);
+  //KASSERT(curproc!=NULL);
 
-  //new process creation
-  c_proc=proc_create_runprogram(curproc->p_name);
-  if(c_proc==NULL) return ENOMEM;
-
-  
-  //duplicate addr space (cp cur addr space to new addr space)
-  as_copy(curproc->p_addrspace,&(c_proc->p_addrspace));
-  if(c_proc->p_addrspace) return ENOMEM;
   //parent trapframe copy (child trapframe creation)
   c_tf=kmalloc(sizeof(struct trapframe)); //allocate space
   if (c_tf==NULL){
-  proc_destroy(c_proc);
-  return ENOMEM;
+    //kfree(c_tf);
+    //proc_destroy(c_proc);
+    //kprintf("\nvivo\n");
+    *retval=ENOMEM;
+    return -1;
   }
   memcpy(c_tf, ctf, sizeof(struct trapframe));//copy
+
+
+  //duplicate addr space (cp cur addr space to new addr space)
+  as_copy(curproc->p_addrspace,&c_addr);
+  if(c_addr==NULL) {
+    kfree(c_tf);
+    //proc_destroy(c_proc);
+    *retval=ENOMEM;
+    return -1;
+  
+  }
+
+  //new process creation
+  c_proc=proc_create_runprogram(curproc->p_name);
+  if(c_proc==NULL) {
+    kfree(c_tf);
+    //proc_destroy(c_proc);
+    *retval=ENOMEM;
+    return -1;
+  }
 
   /*link to child:
  * Create a new thread based on an existing one.
@@ -163,7 +192,7 @@ sys_fork(struct trapframe *ctf, pid_t *retval){
   //int thread_fork(const char *name, struct proc *proc, void (*func)(void *, unsigned long),void *data1, unsigned long data2);
   */
 
-  res_fork= thread_fork(cur->t_name, c_proc,enter_forked_process_syscall,c_tf, (unsigned long)0);
+  res_fork= thread_fork(cur->t_name, c_proc,enter_forked_process_syscall,c_tf, (unsigned long)c_addr);
   //if PARENT return destroy process and free trapframe OF CHILD
   if (res_fork){
     proc_destroy(c_proc);
@@ -173,6 +202,6 @@ sys_fork(struct trapframe *ctf, pid_t *retval){
   }
   //ritorna il child pid
   *retval =c_proc->p_pid;
-  return 0;
+  return res_fork;
 }
 #endif

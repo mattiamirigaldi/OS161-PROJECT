@@ -35,6 +35,7 @@
 #include <thread.h>
 #include <current.h>
 #include <syscall.h>
+#include <addrspace.h>
 
 
 /*
@@ -209,4 +210,5 @@ void
 enter_forked_process(struct trapframe *tf)
 {
 	(void)tf;
+
 }

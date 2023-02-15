@@ -45,9 +45,7 @@ struct addrspace;
 struct thread;
 struct vnode;
 
-#if OPT_WAITPID
-#define opt_waitpid 1
-#endif
+
 /*
  * Process structure.
  *
@@ -77,7 +75,7 @@ struct proc {
 	struct vnode *p_cwd;		/* current working directory */
 
 	/* add more material here as needed */
-	#if opt_waitpid
+	#if OPT_WAITPID
 	struct semaphore *p_semaphore; //semaforo for proc wait e sys_exit
 	int p_status; //stato di ritono dopo sys_exit
 	pid_t p_pid; //pid del processo
@@ -115,9 +113,7 @@ struct addrspace *proc_setas(struct addrspace *);
 
 // wait pid functions
 int proc_wait(struct proc *p);
-struct proc * from_pid_to_proc(pid_t pid);
-#if OPT_FILE
-#endif
+struct proc *from_pid_to_proc(pid_t pid);
 //static void proc_end_waitpid(struct proc *proc);
 //static void proc_init_waitpid(struct proc *proc, const char *name) ;
 #endif /* _PROC_H_ */

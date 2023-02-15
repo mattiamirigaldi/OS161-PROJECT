@@ -117,6 +117,9 @@ common_prog(int nargs, char **args)
 	struct proc *proc;
 	int result;
 	int exit_code;
+	//, pid, exit_code2;
+	//userptr_t returncode=NULL;
+	//int flags=0;
 
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
@@ -144,10 +147,19 @@ common_prog(int nargs, char **args)
 	//wait end of child process with this code CLAUDIA
 	exit_code =proc_wait(proc);
 	if (exit_code) {
-		kprintf("return code: %d\n", exit_code);
+		kprintf("return code proc wait: %d\n", exit_code);
 		return exit_code ;
 	}
+	/*pid=sys_getpid();
+	exit_code2 =sys_waitpid(pid, returncode, flags);
+	if (exit_code2) {
+		kprintf("return code sys wait: %d\n", exit_code);
+		return exit_code2 ;
+	}
 	
+	kprintf("pid %d\n", pid);
+	*/
+	//kprintf("ne sei uscita\n");
 	return 0;
 }
 

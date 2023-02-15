@@ -18,6 +18,11 @@
 #include <limits.h>
 #include <lib.h> //mai mettere lib prima di types, sennò non compila :)
 
+
+
+
+#if OPT_FILE
+
 #define SYS_MAX (10*OPEN_MAX)
 #define use_kernel 0
 /* max num of system wide open files */
@@ -32,11 +37,6 @@ struct openfile SYSfileTable[SYS_MAX];
 struct fileTable{
    struct openfile *ft_openfiles[OPEN_MAX];
 };
-
-
-
-#if OPT_FILE
-
 
 
 //use uio_kinit +VOP read/write+uiomove (to transfer mem btw user&kernel)
@@ -169,50 +169,6 @@ file_write(int fd, userptr_t buf_ptr, size_t size) {
 }
 #endif
 
-#endif
-
-//size_t is the  size of buf
-//buf is a const * 
-int sys_read (int filehandle, userptr_t buf, size_t size){
-	int num;
-	char *stampato = (char *)buf;
-	//to handle read you have have STDIN file, otherwise error
-	if (filehandle!=STDIN_FILENO){
-    #if OPT_FILE
-      return file_read(filehandle, buf, size);
-    #else
-		kprintf("stdin support, no altri\n");
-		return -1;
-    #endif
-	}
-	for(num=0; num<(int)size; num++){
-		stampato[num]= getch();
-		if (stampato[num]<0) return num;
-	}
-	return (int)size;
-}
-
-
-int sys_write (int filehandle,userptr_t	buf, size_t size){
-        int num;
-        char *stampato = (char *)buf;
-        //to handle write you have have STDOUT file, otherwise error
-        
-
-        if (filehandle!=STDOUT_FILENO && filehandle!=STDERR_FILENO){
-          #if OPT_FILE
-           return file_write(filehandle, buf, size);
-          #else
-                kprintf("stdout support, no altri\n");
-                return -1;
-          #endif
-        }
-        for(num=0; num<(int)size; num++){
-                putch(stampato[num]);
-        }
-        return (int)size;
-}
-
 //per processo user: table of pointers to vnode, save pointer a vnode per ogni file create
 //no double table to share data btw user & kernel
 int sys_open(int openflags, userptr_t path, mode_t mode, int *err){
@@ -307,4 +263,48 @@ int sys_close(int filehandle){
 //LOOK AT LOADELF.C
 //if no kernel space: define in uio userspace and segflag
 //struct uio;    /* kernel or userspace I/O buffer (uio.h) */
+
+#endif
+
+//size_t is the  size of buf
+//buf is a const * 
+int sys_read (int filehandle, userptr_t buf, size_t size){
+	int num;
+	char *stampato = (char *)buf;
+	//to handle read you have have STDIN file, otherwise error
+	if (filehandle!=STDIN_FILENO){
+    #if OPT_FILE
+      return file_read(filehandle, buf, size);
+    #else
+		kprintf("stdin support, no altri\n");
+		return -1;
+    #endif
+	}
+	for(num=0; num<(int)size; num++){
+		stampato[num]= getch();
+		if (stampato[num]<0) return num;
+	}
+	return (int)size;
+}
+
+
+int sys_write (int filehandle,userptr_t	buf, size_t size){
+        int num;
+        char *stampato = (char *)buf;
+        //to handle write you have have STDOUT file, otherwise error
+        
+
+        if (filehandle!=STDOUT_FILENO && filehandle!=STDERR_FILENO){
+          #if OPT_FILE
+           return file_write(filehandle, buf, size);
+          #else
+                kprintf("stdout support, no altri\n");
+                return -1;
+          #endif
+        }
+        for(num=0; num<(int)size; num++){
+                putch(stampato[num]);
+        }
+        return (int)size;
+}
 

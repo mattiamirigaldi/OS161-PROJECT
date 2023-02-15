@@ -783,8 +783,9 @@ thread_exit(void)
 
 	cur = curthread;
 	#if OPT_WAITPID
+	//KASSERT(cur->t_proc != NULL);
+	
 	proc_remthread(cur);
-	KASSERT(cur->t_proc == NULL);
 	
 	#else
 	/*
@@ -795,9 +796,12 @@ thread_exit(void)
 	proc_remthread(cur);
 
 	/* Make sure we *are* detached (move this only if you're sure!) */
-	KASSERT(cur->t_proc == NULL);
+	
 	#endif
+	KASSERT(cur->t_proc == NULL);
 	/* Check the stack guard band. */
+
+
 	thread_checkstack(cur);
 
 	/* Interrupts off on this processor */
