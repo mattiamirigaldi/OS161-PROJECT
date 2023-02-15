@@ -35,7 +35,7 @@
 #include <thread.h>
 #include <current.h>
 #include <syscall.h>
-
+#include <copyinout.h>
 
 /*
  * System call dispatcher.
@@ -81,6 +81,9 @@ syscall(struct trapframe *tf)
   int callno;
   int32_t retval;
   int err;
+  int64_t sys_pos;
+  int64_t sys_retval64 = 0;
+  int whence;
 
   KASSERT(curthread != NULL);
   KASSERT(curthread->t_curspl == 0);
@@ -119,8 +122,7 @@ syscall(struct trapframe *tf)
 			tf->tf_a1,
 			(mode_t) tf->tf_a2,
 			&err);
-      if (retval<0) err = ENOSYS;
-      else err=0;
+      if (retval == 0) err = 0;
       break;
     case SYS_close:
       retval = sys_close(tf->tf_a0);
@@ -131,16 +133,33 @@ syscall(struct trapframe *tf)
       retval = sys_write(tf->tf_a0,
 			 (userptr_t)tf->tf_a1,
 			 (size_t)tf->tf_a2);
-      if(retval<0) err = ENOSYS;
+      if (retval<0) err = ENOSYS;
       else err = 0;
       break;
     case SYS_read:
       retval = sys_read(tf->tf_a0,
 			(userptr_t)tf->tf_a1,
 			(size_t)tf->tf_a2);
-      if(retval<0) err = ENOSYS;
+      if (retval<0) err = ENOSYS;
       else err = 0;
       break;
+    case SYS_dup2:
+      retval = sys_dup2( tf->tf_a0,
+			 tf->tf_a1,
+			 &err);
+      if (retval == 0) err = 0;
+      break;
+    case SYS_lseek:   
+      sys_pos = tf->tf_a3 | (uint64_t)tf->tf_a2 << 32 ;
+      copyin((const_userptr_t) (tf->tf_sp + 16), &whence, sizeof(whence));
+      sys_retval64 = sys_lseek((int)tf->tf_a0,
+			       (off_t)sys_pos,
+			       whence,
+			       &err);
+      
+      retval = (uint32_t) (sys_retval64 >> 32);   // Most significant 32 bits in v0 
+      break;
+    // Process management syscall
     case SYS_waitpid:
       retval = sys_waitpid( (pid_t)tf->tf_a0,
 			    (userptr_t)tf->tf_a1,
@@ -156,9 +175,6 @@ syscall(struct trapframe *tf)
     case SYS_fork:
       err = sys_fork(tf, &retval);
       break;
-	    
-	      
-	    /* Add stuff here */
 
     default:
       kprintf("Unknown syscall %d\n", callno);
@@ -167,32 +183,37 @@ syscall(struct trapframe *tf)
   }
 
 
-	if (err) {
-		/*
-		 * Return the error code. This gets converted at
-		 * userlevel to a return value of -1 and the error
-		 * code in errno.
-		 */
-		tf->tf_v0 = err;
-		tf->tf_a3 = 1;      /* signal an error */
-	}
-	else {
-		/* Success. */
-		tf->tf_v0 = retval;
-		tf->tf_a3 = 0;      /* signal no error */
-	}
+  if (err) {
+    /*
+     * Return the error code. This gets converted at
+     * userlevel to a return value of -1 and the error
+     * code in errno.
+     */
+    tf->tf_v0 = err;
+    tf->tf_a3 = 1;      /* signal an error */
+  }
+  else {
+    if (sys_retval64 > 0) {
+      tf->tf_v1 = (int32_t)(sys_retval64); //least significant 32 bits in v1
+    } else {
+      tf->tf_v1 = 0;
+    }
+    /* Success. */
+    tf->tf_v0 = retval;
+    tf->tf_a3 = 0;      /* signal no error */
+  }
 
-	/*
-	 * Now, advance the program counter, to avoid restarting
-	 * the syscall over and over again.
-	 */
+  /*
+   * Now, advance the program counter, to avoid restarting
+   * the syscall over and over again.
+   */
 
-	tf->tf_epc += 4;
+  tf->tf_epc += 4;
 
-	/* Make sure the syscall code didn't forget to lower spl */
-	KASSERT(curthread->t_curspl == 0);
-	/* ...or leak any spinlocks */
-	KASSERT(curthread->t_iplhigh_count == 0);
+  /* Make sure the syscall code didn't forget to lower spl */
+  KASSERT(curthread->t_curspl == 0);
+  /* ...or leak any spinlocks */
+  KASSERT(curthread->t_iplhigh_count == 0);
 }
 
 /*

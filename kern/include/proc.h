@@ -50,9 +50,11 @@ struct vnode;
  */
 struct fdesc {
   char* file_name;                   /* Used for debugging */
-  off_t file_offset;                 
+  off_t file_offset;                 /* lseek current position */
   unsigned int file_refcount;        /* count how many process are referencing the file */
-  struct vnode* file_v;                     /* pointer to actual vnode file */
+  struct vnode* file_v;              /* pointer to actual vnode file */
+  struct lock* file_lock;            /* used to manage synchronization on fdesc */
+  mode_t file_mode;                  /* define access mode to file */
 };
 
 /*

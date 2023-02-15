@@ -11,4 +11,6 @@ file_syscall.o: ../../syscall/file_syscall.c ../../include/types.h \
  ../../include/synch.h ../../include/kern/errno.h ../../include/current.h \
  includelinks/machine/current.h ../../include/thread.h \
  ../../include/threadlist.h includelinks/machine/thread.h \
- ../../include/setjmp.h includelinks/kern/machine/setjmp.h
+ ../../include/setjmp.h includelinks/kern/machine/setjmp.h \
+ ../../include/kern/fcntl.h ../../include/kern/seek.h \
+ ../../include/kern/stat.h
