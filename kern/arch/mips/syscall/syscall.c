@@ -159,6 +159,12 @@ syscall(struct trapframe *tf)
       
       retval = (uint32_t) (sys_retval64 >> 32);   // Most significant 32 bits in v0 
       break;
+    case SYS_chdir:
+      retval = sys_chdir( (char*)tf->tf_a0,
+			  &err);
+      if (retval == 0) err = 0;
+      break;
+      
     // Process management syscall
     case SYS_waitpid:
       retval = sys_waitpid( (pid_t)tf->tf_a0,

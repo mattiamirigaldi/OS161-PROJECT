@@ -357,6 +357,31 @@ sys_lseek(int fd, off_t pos, int whence, int *errp)
 }
 
 
+int
+sys_chdir(char *path_usr, int *errp)
+{
+  int result = 0;
+  size_t actual = 0;
+  char *path_kern = kmalloc(sizeof(char) * PATH_MAX);
+  result = copyinstr((const_userptr_t) path_usr, path_kern, PATH_MAX, &actual);
+  if (result) {
+    kfree(path_kern);
+    *errp = EFAULT;
+    return -1;
+  }
+
+  result = vfs_chdir(path_kern);
+
+  if (result) {
+    kfree(path_kern);
+    *errp = result;
+    return -1;
+  }
+
+  kfree(path_kern);
+  return 0;
+}
+
 
 /*
  * Function that initializes console file descriptors
