@@ -43,6 +43,7 @@
 #include <sfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <current.h>
 #include "opt-sfs.h"
 #include "opt-net.h"
 
@@ -92,9 +93,10 @@ cmd_progthread(void *ptr, unsigned long nargs)
 	if (result) {
 		kprintf("Running program %s failed: %s\n", args[0],
 			strerror(result));
+		sys__exit(result);
 		return;
 	}
-
+	sys__exit(result);
 	/* NOTREACHED: runprogram only returns on error. */
 }
 
@@ -116,10 +118,7 @@ common_prog(int nargs, char **args)
 {
 	struct proc *proc;
 	int result;
-	int exit_code;
-	//, pid, exit_code2;
-	//userptr_t returncode=NULL;
-	//int flags=0;
+	
 
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
@@ -144,6 +143,10 @@ common_prog(int nargs, char **args)
 	 * The new process will be destroyed when the program exits...
 	 * once you write the code for handling that.
 	 */
+	int exit_code;
+	//, pid, exit_code2;
+	//int returncode;
+	//int flags=0;
 	//wait end of child process with this code CLAUDIA
 	exit_code =proc_wait(proc);
 	if (exit_code) {
@@ -151,7 +154,7 @@ common_prog(int nargs, char **args)
 		return exit_code ;
 	}
 	/*pid=sys_getpid();
-	exit_code2 =sys_waitpid(pid, returncode, flags);
+	exit_code2 =sys_waitpid(proc->pid, &returncode, flags);
 	if (exit_code2) {
 		kprintf("return code sys wait: %d\n", exit_code);
 		return exit_code2 ;

@@ -184,13 +184,13 @@ sys_open(userptr_t filepath, int openflags, mode_t mode, int *err){
   struct openfile *of=NULL;
   int result;
   int i, fd;
-  //char *console=NULL;
+  char *console=NULL;
   
-  //console= kstrdup((char *)path);
+  
   char *path= (char *)filepath;
-  
-  result = vfs_open(path, openflags, mode, &vn);
-  //kfree(console);
+  console= kstrdup((const char *)path);
+  result = vfs_open(console, openflags, mode, &vn);
+  kfree(console);
   //kprintf("prova0\n");
   if (result) {
     *err= ENOENT;

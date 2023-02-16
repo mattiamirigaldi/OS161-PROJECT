@@ -22,7 +22,8 @@
 #include <limits.h>
 #include <kern/wait.h> //waitpid options ERRORS
 #include <kern/fcntl.h> //file constant modes rwoc
-
+#include <vnode.h>
+#include <vfs.h>
 
 
 //if static voi no cite on file.h
@@ -239,13 +240,15 @@ sys_fork(struct trapframe *ctf, pid_t *retval){
 
 int 
 sys_execv (char* progr, char **args){
-  /*
   struct addrspace* new_as=NULL;
   struct addrspace* old_as;
   struct vnode *v_exe;
   int res_executable, res_k2u;
   vaddr_t entrypoint, stackptr;
-  int args_counter;
+  int args_counter=0;
+  int args_counter_copy = 0;
+  int asize = 0;
+  int padding = 0;
 
   //CHECK PASSED PARAMETERS
     //invalid arguments
@@ -261,12 +264,54 @@ sys_execv (char* progr, char **args){
 //char **args: pointers to usr space string--> not defined number of args
 //for each pointer: cp strings with copyin until NULL
 
-
-
-
 //1- args count
+    while(args[args_counter] != NULL){
+      args_counter++;
+    }
+    // implement error: total size of arg strings too large
+    if (args_counter > ARG_MAX) {
+        return E2BIG;
+    }
+    
+  
+    char *progr_copy = (char *) kmalloc(sizeof(char) * PATH_MAX);
+    size_t actual = 0;
+    res_executable = copyinstr((userptr_t)progr, progr_copy, PATH_MAX, &actual);
+    //fail copy instruction  
+    if (res_executable) {
+        kfree(progr_copy);
+        return res_executable;
+    }
+   //TMP STORE ARGS, too many execv generate lots of kmalloc that break the os
+
+    //kmem to args
+    char **args_copy = (char **) kmalloc(sizeof(char *) * args_counter);
+    //check if args access to a not allowed addr space
+    while(args_copy[args_counter_copy] != NULL){
+      if ((int *)args[args_counter_copy] == (int *)0x40000000 || (int *)args[args_counter_copy] == (int *)0x80000000) {
+        kfree(progr_copy);
+        return EFAULT;
+        break; //not needed
+      }
+      else args_counter_copy++;
+    }
 
 
+    //  PADDING: mips divisible by 4
+    //no need to pad also the name because is a char (1byte no allign issues)
+    //characters array can start from any addr
+    args_counter_copy = 0;
+    for (;args_counter_copy < args_counter; args_counter_copy++) {
+        asize = strlen(args[args_counter_copy]) + 1; //lenght of word+ termiination
+        //allocate strings
+        args_copy[args_counter_copy] = (char *) kmalloc(sizeof(char) * asize);
+        copyinstr((userptr_t)args[args_counter_copy], args_copy[args_counter_copy], asize, &actual);
+        //padding is the sum of every string size+ relative padding
+        padding+= asize;
+        //if modulo is not =0, aka is not divisible for 4
+        int modul=padding % 4;
+        if (modul) padding+= (4 - modul) % 4;
+    }
 //mips: pointers alignment by 4
 
 
@@ -277,15 +322,13 @@ sys_execv (char* progr, char **args){
   //open exe file
 	res_executable = vfs_open(progr, O_RDONLY, 0, &v_exe);
 	if (res_executable) {
-//-->>>>>>>>>>>    //free copy! of progr kern buf
+    kfree(progr_copy);
 		return res_executable;
 	}
 
-
-
-
-//-->>>>>>>>>>> destroy current addr space
-
+  //NB DESTROY CURRENT ADDR SPACE TO CHECK getas==null
+old_as=curproc->p_addrspace;
+as_destroy(old_as);
 
 
 
@@ -297,7 +340,7 @@ sys_execv (char* progr, char **args){
 	// Create a new address spac. 
 	new_as = as_create();
 	if (new_as == NULL) {
-//-->>>>>>>>>>>    //free copy! of progr kern buf
+    kfree(progr_copy);
 		vfs_close(v_exe);
 		return ENOMEM;
 	}
@@ -310,40 +353,78 @@ sys_execv (char* progr, char **args){
 	res_executable = load_elf(v_exe, &entrypoint);
 	if (res_executable) {
 		//p_addrspace will go away when curproc is destroyed 
- //-->>>>>>>>>>>    //free copy! of progr kern buf
-		vfs_close(v_exe);
+    kfree(progr_copy);
+		vfs_close(v_exe); 
 		return res_executable;
 	}
 
-  //close file: done 
+  //close executable file: done 
   vfs_close(v_exe);
   /////////////////////////////////////////////
+  
+ //cp args from kern buff to usr space: USE USER STACK space, the only known
+  //as_define_stack: user stack, aka USER_SPACE_TOP
   res_k2u = as_define_stack(new_as, &stackptr);
 	if (res_k2u) {
 		// p_addrspace will go away when curproc is destroyed 
+    kfree(progr_copy);
 		return res_k2u;
 	}
 
+ //stack is 8 bit aligned
+  stackptr=-padding; //occupied addr space 
+  //take into account termination
+  char **args_addr = (char **) kmalloc(sizeof(char *) * args_counter+1);
+  //cp arg to stack and store its adrr
 
- //cp args from kern buff to usr space: USE USER STACK space, the only known
-  //as_define_stack: user stack, aka USER_SPACE_TOP
 
-  /////////////////////////////////
+  for (int i=0;i< args_counter;i++ ) {
+      asize = strlen(args_copy[args_counter]) + 1; //lenght of word+ termiination
+      
+      //if modulo is not =0, aka is not divisible for 4
+      int modul_size=asize % 4;
+      if (modul_size) asize+= (4 - modul_size) % 4;
+      args_addr[i]=(char*)stackptr;
+      copyoutstr(args_copy[i], (userptr_t)stackptr, asize, &actual);
+      stackptr+=asize;
+  }
+  args_addr[args_counter]=0; //termination
+  stackptr=-padding; //occupied addr space 
+  stackptr=-(args_counter+1)* sizeof(char *); //occupied addr space 
+
+
+  //cp addr of addrs into stack
+   for (int i=0;i< args_counter;i++ ) {
+      copyout((args_addr+1), (userptr_t)stackptr, sizeof(char *));
+      stackptr+=sizeof(char *);
+  }
+
+  // END PROCESS: FREE COPIESS
+  //go to the start of the stack
+  stackptr=-(args_counter+1)* sizeof(char *); 
+  kfree(progr_copy);
+
+  args_counter_copy = 0;
+    for (;args_counter_copy < args_counter; args_counter_copy++){
+      kfree(args_copy[args_counter_copy]);
+    }
+  kfree(args_copy);
+  kfree(args_addr);
   
-  
+   /////////////////////////////////
   //AS RUNPROGRAM: run user mode, use function "enter new proc"
   // Warp to user mode
   //argc,userspace addr of argv,userspace addr of environment...
-	enter_new_process(args_BOHHHH, stackptr,
-			  stackptr , (userptr_t)
+	enter_new_process(args_counter,(userptr_t) stackptr, (userptr_t)stackptr , 
 			  stackptr, entrypoint);
 
 	// enter_new_process does not return
 	panic("enter_new_process returned\n");
 	return EINVAL;
-  */
-
+  
+/*
  (void)progr;
  (void)args;
  return 0;
+ */
 }

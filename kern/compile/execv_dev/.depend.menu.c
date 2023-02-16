@@ -13,4 +13,5 @@ menu.o: ../../main/menu.c ../../include/types.h \
  includelinks/kern/machine/setjmp.h ../../include/proc.h opt-waitpid.h \
  opt-file.h ../../include/vfs.h ../../include/sfs.h ../../include/fs.h \
  ../../include/vnode.h ../../include/kern/sfs.h ../../include/syscall.h \
- opt-syscalls.h opt-fork.h ../../include/test.h opt-sfs.h opt-net.h
+ opt-syscalls.h opt-fork.h ../../include/test.h ../../include/current.h \
+ includelinks/machine/current.h opt-sfs.h opt-net.h
