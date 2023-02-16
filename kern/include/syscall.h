@@ -66,12 +66,12 @@ int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 
 #if OPT_SYSCALLS
 int sys_read(int filehandle, userptr_t buf, size_t size);
-int sys_write(int filehandle, userptr_t buf, size_t size);
+int sys_write(int filedesc, userptr_t buf, size_t size);
 void sys__exit(int status);
 int sys_waitpid (pid_t pid, userptr_t returncode, int flags); 	
 pid_t sys_getpid(void);
 #if OPT_FILE
-int sys_open(int filehandle, userptr_t buf, mode_t mode, int *err );
+int sys_open( userptr_t filepath,int openflags, mode_t mode, int *err );
 int sys_close(int filehandle);
 #endif
 #if OPT_FORK

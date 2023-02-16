@@ -111,11 +111,11 @@ make a table: IN PROC.C (pid, *proc). new proc new line, removed proc removed li
 */
 
 //INITIAL CHECKS FOR WAITPID BADCALLS
-
+int *ret_c = (int *)returncode;
     //invalid pointers:
     if (returncode==NULL) return -1;
 
-    if(returncode == (int*) 0x40000000 || returncode == (int*) 0x80000000 || ((int)returncode & 3) != 0) {
+    if(ret_c == (int*) 0x40000000 || ret_c == (int*) 0x80000000 || ((int)ret_c & 3) != 0) {
       return -1;
     }
     //invalid options:
@@ -239,6 +239,7 @@ sys_fork(struct trapframe *ctf, pid_t *retval){
 
 int 
 sys_execv (char* progr, char **args){
+  /*
   struct addrspace* new_as=NULL;
   struct addrspace* old_as;
   struct vnode *v_exe;
@@ -262,14 +263,16 @@ sys_execv (char* progr, char **args){
 
 
 
-/*
-1- args count
 
-*/
+//1- args count
+
+
 //mips: pointers alignment by 4
 
 
 ////////////////////////////////
+
+
   //AS RUNPROGRAM: open executable, create new addr space, load elf
   //open exe file
 	res_executable = vfs_open(progr, O_RDONLY, 0, &v_exe);
@@ -287,11 +290,11 @@ sys_execv (char* progr, char **args){
 
 
 
+	// We should be a new process
 
-	/* We should be a new process. */
 	KASSERT(proc_getas() == NULL);
 
-	/* Create a new address space. */
+	// Create a new address spac. 
 	new_as = as_create();
 	if (new_as == NULL) {
 //-->>>>>>>>>>>    //free copy! of progr kern buf
@@ -299,14 +302,14 @@ sys_execv (char* progr, char **args){
 		return ENOMEM;
 	}
 
-	/* Switch to it and activate it. */
+	// Switch to it and activate it
 	proc_setas(new_as);
 	as_activate();
 
-	/* Load the executable. */
+	// Load the executable. 
 	res_executable = load_elf(v_exe, &entrypoint);
 	if (res_executable) {
-		/* p_addrspace will go away when curproc is destroyed */
+		//p_addrspace will go away when curproc is destroyed 
  //-->>>>>>>>>>>    //free copy! of progr kern buf
 		vfs_close(v_exe);
 		return res_executable;
@@ -317,7 +320,7 @@ sys_execv (char* progr, char **args){
   /////////////////////////////////////////////
   res_k2u = as_define_stack(new_as, &stackptr);
 	if (res_k2u) {
-		/* p_addrspace will go away when curproc is destroyed */
+		// p_addrspace will go away when curproc is destroyed 
 		return res_k2u;
 	}
 
@@ -329,12 +332,18 @@ sys_execv (char* progr, char **args){
   
   
   //AS RUNPROGRAM: run user mode, use function "enter new proc"
-  /* Warp to user mode. */
-	enter_new_process(args_BOHHHH/*argc*/, stackptr /*userspace addr of argv*/,
-			  stackptr /*userspace addr of environment*/, (userptr_t)
+  // Warp to user mode
+  //argc,userspace addr of argv,userspace addr of environment...
+	enter_new_process(args_BOHHHH, stackptr,
+			  stackptr , (userptr_t)
 			  stackptr, entrypoint);
 
-	/* enter_new_process does not return. */
+	// enter_new_process does not return
 	panic("enter_new_process returned\n");
 	return EINVAL;
+  */
+
+ (void)progr;
+ (void)args;
+ return 0;
 }

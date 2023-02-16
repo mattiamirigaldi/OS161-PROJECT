@@ -67,14 +67,14 @@ vfs_open(char *path, int openflags, mode_t mode, struct vnode **ret)
 		char name[NAME_MAX+1];
 		struct vnode *dir;
 		int excl = (openflags & O_EXCL)!=0;
-
+		//kprintf("prova1\n");
 		result = vfs_lookparent(path, &dir, name, sizeof(name));
 		if (result) {
 			return result;
 		}
-
+		//kprintf("prova1\n");
 		result = VOP_CREAT(dir, name, excl, mode, &vn);
-
+		//kprintf("prova1\n");
 		VOP_DECREF(dir);
 	}
 	else {

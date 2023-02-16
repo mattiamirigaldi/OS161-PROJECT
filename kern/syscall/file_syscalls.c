@@ -17,7 +17,7 @@
 #include <syscall.h>
 #include <limits.h>
 #include <lib.h> //mai mettere lib prima di types, sennò non compila :)
-
+#include <kern/fcntl.h> //file flags modes
 
 
 
@@ -29,6 +29,7 @@
 struct openfile{
 	struct vnode *vn;
 	off_t offset;
+  int mode;
 	unsigned int count;
   struct lock *f_lock;
 };
@@ -71,6 +72,7 @@ file_read(int fd, userptr_t buf_ptr, size_t size) {
 
 static int
 file_write(int fd, userptr_t buf_ptr, size_t size) {
+  kprintf("qui arriva\n");
   struct iovec iov;
   struct uio kernelu;
   int result, nwrite; //change from write
@@ -141,12 +143,17 @@ file_write(int fd, userptr_t buf_ptr, size_t size) {
   int result, nwrite;
   struct vnode *vn;
   struct openfile *of;
-
+  kprintf("qui arriva\n");
   if (fd<0||fd>OPEN_MAX) return -1;
+  kprintf("prova1\n");
   of = curproc->fileTable[fd];
+  kprintf("prova0\n");
   if (of==NULL) return -1;
+  kprintf("prova1\n");
   vn = of->vn;
+  kprintf("prova2\n");
   if (vn==NULL) return -1;
+  kprintf("prova3\n");
 
   iov.iov_ubase = buf_ptr;
   iov.iov_len = size;
@@ -171,59 +178,80 @@ file_write(int fd, userptr_t buf_ptr, size_t size) {
 
 //per processo user: table of pointers to vnode, save pointer a vnode per ogni file create
 //no double table to share data btw user & kernel
-int sys_open(int openflags, userptr_t path, mode_t mode, int *err){
+int 
+sys_open(userptr_t filepath, int openflags, mode_t mode, int *err){
   struct vnode *vn;
   struct openfile *of=NULL;
   int result;
   int i, fd;
-  char *console=NULL;
-  console= kstrdup((char *)path);
-  result = vfs_open(console, openflags, mode, &vn);
-  kfree(console);
+  //char *console=NULL;
+  
+  //console= kstrdup((char *)path);
+  char *path= (char *)filepath;
+  
+  result = vfs_open(path, openflags, mode, &vn);
+  //kfree(console);
+  //kprintf("prova0\n");
   if (result) {
     *err= ENOENT;
     return -1;
   }
-  //initialize
-  of->f_lock=lock_create("lock file");
+
+    //initialize
+  /*
+  of->f_lock=lock_create("lock_file");
+  kprintf("prova1 \n");
   if (of->f_lock==NULL) { // no free slot in system open file table
     vfs_close(vn);
     kfree(of);
     return ENOMEM;
   }
-
+  */
+  
   for (i=0; i<SYS_MAX; i++) {
     if (SYSfileTable[i].vn==NULL) {
       of = &SYSfileTable[i];
       of->vn = vn;
       of->offset = 0; // handle offset with append
+      of->mode= openflags & O_ACCMODE; /* flag and mask for O_RDONLY/O_WRONLY/O_RDWR */
       of->count = 1;
       break;
     }
   }
+  
+  KASSERT(of->mode==O_RDONLY ||of->mode==O_WRONLY||of->mode==O_RDWR);
+  
+  
   if (of==NULL) { // no free slot in system open file table
     vfs_close(vn);
-    lock_destroy(of->f_lock);
+    //lock_destroy(of->f_lock);
+    //kprintf("prova0\n");
     *err= ENOMEM;
   }
-  //handle modes...........
+  //check possible modes for open
+  
   else {
     for (fd=STDERR_FILENO+1; fd<OPEN_MAX; fd++) {
       if (curproc->fileTable[fd] == NULL) {
 	        curproc->fileTable[fd] = of;
-	        result=fd;
+          //kprintf("open fd %d\n", fd); //fd=3
+	        return fd;
       }
     }
     // no free slot in process open file table
+    
     *err= ENOMEM;
-    result=ENOMEM;
+    //result=ENOMEM;
   }
+  //if not returned=error, free table and close vnode
+  //kprintf("open fd %d\n", result);
   if (result) {
-    lock_destroy(of->f_lock);
+    //lock_destroy(of->f_lock);
     kfree(of);
     vfs_close(vn);
     return result;
   }
+  
   return 0;
 
 }
@@ -290,15 +318,17 @@ int sys_read (int filehandle, userptr_t buf, size_t size){
 }
 
 
-int sys_write (int filehandle,userptr_t	buf, size_t size){
+int sys_write (int filedesc,userptr_t	buf, size_t size){
         int num;
         char *stampato = (char *)buf;
         //to handle write you have have STDOUT file, otherwise error
+        //kprintf("qui arriva\n");
+        if (filedesc!=STDOUT_FILENO && filedesc!=STDERR_FILENO){
         
-
-        if (filehandle!=STDOUT_FILENO && filehandle!=STDERR_FILENO){
+        // kprintf("qui no\n");
+        
           #if OPT_FILE
-           return file_write(filehandle, buf, size);
+           return file_write(filedesc, buf, size);
           #else
                 kprintf("stdout support, no altri\n");
                 return -1;
