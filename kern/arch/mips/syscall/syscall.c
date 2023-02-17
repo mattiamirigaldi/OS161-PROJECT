@@ -143,18 +143,24 @@ syscall(struct trapframe *tf)
 		else err=0;
 	break;
 	#if OPT_FILE
+		case SYS_remove:
+			retval=0;
+			err=0;
+		break;
 		case SYS_open:
 			retval=sys_open((userptr_t)tf->tf_a0, 
 			(int)tf->tf_a1,
 			(mode_t)tf->tf_a2, 
 			&err);
+			//kprintf("open retval %d\n", retval);
 			//if (retval<0) err= ENOSYS;
 			//else err=0;
 		break;
 		case SYS_close:
 			retval=sys_close((int)tf->tf_a0);
+			//kprintf("open retval %d\n", retval);
 			if (retval<0) err= ENOMEM;
-			//else err=0;
+			else err=0;
 		break;
 
 	#endif

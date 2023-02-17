@@ -143,17 +143,15 @@ file_write(int fd, userptr_t buf_ptr, size_t size) {
   int result, nwrite;
   struct vnode *vn;
   struct openfile *of;
-  kprintf("qui arriva\n");
+ 
   if (fd<0||fd>OPEN_MAX) return -1;
-  kprintf("prova1\n");
+  
   of = curproc->fileTable[fd];
-  kprintf("prova0\n");
   if (of==NULL) return -1;
-  kprintf("prova1\n");
+  
   vn = of->vn;
-  kprintf("prova2\n");
   if (vn==NULL) return -1;
-  kprintf("prova3\n");
+  
 
   iov.iov_ubase = buf_ptr;
   iov.iov_len = size;
@@ -172,6 +170,7 @@ file_write(int fd, userptr_t buf_ptr, size_t size) {
 
   of->offset = u.uio_offset;
   nwrite = size - u.uio_resid;
+  //kprintf("qui arriva a 40\n");
   return (nwrite);
 }
 #endif
@@ -191,22 +190,14 @@ sys_open(userptr_t filepath, int openflags, mode_t mode, int *err){
   console= kstrdup((const char *)path);
   result = vfs_open(console, openflags, mode, &vn);
   kfree(console);
-  //kprintf("prova0\n");
+ 
   if (result) {
     *err= ENOENT;
     return -1;
   }
 
     //initialize
-  /*
-  of->f_lock=lock_create("lock_file");
-  kprintf("prova1 \n");
-  if (of->f_lock==NULL) { // no free slot in system open file table
-    vfs_close(vn);
-    kfree(of);
-    return ENOMEM;
-  }
-  */
+ 
   
   for (i=0; i<SYS_MAX; i++) {
     if (SYSfileTable[i].vn==NULL) {
@@ -218,6 +209,14 @@ sys_open(userptr_t filepath, int openflags, mode_t mode, int *err){
       break;
     }
   }
+   
+  of->f_lock=lock_create("lock_file");
+  if (of->f_lock==NULL) { // no free slot in system open file table
+    vfs_close(vn);
+    kfree(of);
+    return ENOMEM;
+  }
+
   
   KASSERT(of->mode==O_RDONLY ||of->mode==O_WRONLY||of->mode==O_RDWR);
   
@@ -229,20 +228,23 @@ sys_open(userptr_t filepath, int openflags, mode_t mode, int *err){
     *err= ENOMEM;
   }
   //check possible modes for open
-  
   else {
     for (fd=STDERR_FILENO+1; fd<OPEN_MAX; fd++) {
       if (curproc->fileTable[fd] == NULL) {
 	        curproc->fileTable[fd] = of;
           //kprintf("open fd %d\n", fd); //fd=3
-	        return fd;
+          *err=0;
+          return fd;
       }
     }
     // no free slot in process open file table
     
     *err= ENOMEM;
+  
     //result=ENOMEM;
   }
+   
+  
   //if not returned=error, free table and close vnode
   //kprintf("open fd %d\n", result);
   if (result) {
@@ -251,13 +253,13 @@ sys_open(userptr_t filepath, int openflags, mode_t mode, int *err){
     vfs_close(vn);
     return result;
   }
-  
+
   return 0;
 
 }
 int sys_close(int filehandle){
 //vfs_close in runprogram
-  struct vnode *vn;
+  struct vnode *vn_f;
   struct openfile *of;
   
 
@@ -267,17 +269,19 @@ int sys_close(int filehandle){
   
 
   lock_acquire(of->f_lock);
-  vn = of->vn;
+  vn_f = of->vn;
+  curproc->fileTable[filehandle]=NULL;
   //of->vn=NULL;
   //if (vn==NULL) return -1;
   //LAST CLOSE, FREE EVERYTHING
   if ((of->count)==1) {
     lock_release(of->f_lock);
     lock_destroy(of->f_lock);
-    if (vn==NULL) return -1;
-    vfs_close (vn); //close file 
-    kfree(of);
-
+    of->vn=NULL;
+    if (vn_f==NULL) return -1;
+    vfs_close (vn_f); //close file 
+    //kfree(of);
+   
   }
   else {
     KASSERT((of->count)>1);
@@ -285,9 +289,9 @@ int sys_close(int filehandle){
     lock_release(of->f_lock);
 
   }
-  curproc->fileTable[filehandle]=NULL;
+  //curproc->fileTable[filehandle]=NULL;
+  
   return 0;
-
 }
 
 //LOOK AT LOADELF.C

@@ -327,16 +327,17 @@ sys_execv (char* progr, char **args){
 	}
 
   //NB DESTROY CURRENT ADDR SPACE TO CHECK getas==null
-old_as=curproc->p_addrspace;
-as_destroy(old_as);
+  old_as=curproc->p_addrspace;
+  curproc->p_addrspace=NULL;
+  as_destroy(old_as);
 
-
+  kprintf("1");
 
 
 	// We should be a new process
 
 	KASSERT(proc_getas() == NULL);
-
+  kprintf("2");
 	// Create a new address spac. 
 	new_as = as_create();
 	if (new_as == NULL) {
@@ -344,7 +345,7 @@ as_destroy(old_as);
 		vfs_close(v_exe);
 		return ENOMEM;
 	}
-
+kprintf("3");
 	// Switch to it and activate it
 	proc_setas(new_as);
 	as_activate();

@@ -68,30 +68,42 @@ main(int argc, char *argv[])
 		err(1, "%s: open for write", file);
 	}
 
-
+	printf("file opened...\n");
 	rv = write(fd, writebuf, 40);
 	if (rv<0) {
 		err(1, "%s: write", file);
 	}
+	printf("file written...\n");
 
 	rv = close(fd);
 	if (rv<0) {
 		err(1, "%s: close (1st time)", file);
 	}
+	printf("file closed...");
 
 	fd = open(file, O_RDONLY);
 	if (fd<0) {
 		err(1, "%s: open for read", file);
 	}
+	printf("file opened...\n");
 
 	rv = read(fd, readbuf, 40);
 	if (rv<0) {
 		err(1, "%s: read", file);
 	}
+	printf("file read...\n");
+
+
+
+
 	rv = close(fd);
 	if (rv<0) {
 		err(1, "%s: close (2nd time)", file);
 	}
+	printf("file closed..\n");
+
+
+
 	/* ensure null termination */
 	readbuf[40] = 0;
 

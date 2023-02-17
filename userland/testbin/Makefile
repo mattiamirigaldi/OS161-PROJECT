@@ -6,11 +6,12 @@ TOP=../..
 .include "$(TOP)/mk/os161.config.mk"
 
 SUBDIRS=add argtest badcall bigexec bigfile bigfork bigseek bloat conman \
-	crash ctest dirconc dirseek dirtest f_test factorial farm faulter \
-	filetest forkbomb forktest frack hash hog huge \
+	crash ctest dirconc dirseek dirtest f_close f_open f_open2 \
+	f_read f_write f_test factorial farm faulter \
+	filetest forkbomb forktest frack hash hog huge kitchen\
 	malloctest matmult multiexec palin parallelvm poisondisk psort \
 	randcall redirect rmdirtest rmtest \
-	sbrktest schedpong sort sparsefile tail tictac triplehuge \
+	sbrktest schedpong sink sort sparsefile sty tail tictac triplehuge \
 	triplemat triplesort usemtest zero
 
 # But not:
