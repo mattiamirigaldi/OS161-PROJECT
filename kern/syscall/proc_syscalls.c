@@ -7,7 +7,7 @@
 
 #include <types.h>
 #include <kern/unistd.h>
-
+#include <kern/fcntl.h> //file constant modes rwoc
 #include <kern/errno.h> //fork errors
 #include <clock.h>
 #include <copyinout.h>
@@ -21,7 +21,8 @@
 #include <current.h> //curthread, curproc
 #include <limits.h>
 #include <kern/wait.h> //waitpid options ERRORS
-#include <kern/fcntl.h> //file constant modes rwoc
+#include <vm.h>
+#include <test.h>
 #include <vnode.h>
 #include <vfs.h>
 
@@ -265,9 +266,7 @@ sys_execv (char* progr, char **args){
 //for each pointer: cp strings with copyin until NULL
 
 //1- args count
-    while(args[args_counter] != NULL){
-      args_counter++;
-    }
+    for(; args_counter <ARG_MAX && args[args_counter] != NULL; args_counter++);
     // implement error: total size of arg strings too large
     if (args_counter > ARG_MAX) {
         return E2BIG;
@@ -287,13 +286,13 @@ sys_execv (char* progr, char **args){
     //kmem to args
     char **args_copy = (char **) kmalloc(sizeof(char *) * args_counter);
     //check if args access to a not allowed addr space
-    while(args_copy[args_counter_copy] != NULL){
+    args_counter_copy=0;
+    for(;args_counter< args_counter_copy ;args_counter_copy++){
       if ((int *)args[args_counter_copy] == (int *)0x40000000 || (int *)args[args_counter_copy] == (int *)0x80000000) {
         kfree(progr_copy);
         return EFAULT;
         break; //not needed
       }
-      else args_counter_copy++;
     }
 
 
@@ -320,7 +319,11 @@ sys_execv (char* progr, char **args){
 
   //AS RUNPROGRAM: open executable, create new addr space, load elf
   //open exe file
-	res_executable = vfs_open(progr, O_RDONLY, 0, &v_exe);
+  char *console;
+  char *path= (char *)progr;
+  console= kstrdup((const char *)path);
+	res_executable = vfs_open(path, O_RDONLY, 0, &v_exe);
+  kfree(console);
 	if (res_executable) {
     kfree(progr_copy);
 		return res_executable;
@@ -331,13 +334,13 @@ sys_execv (char* progr, char **args){
   curproc->p_addrspace=NULL;
   as_destroy(old_as);
 
-  kprintf("1");
+  
 
 
 	// We should be a new process
 
 	KASSERT(proc_getas() == NULL);
-  kprintf("2");
+  
 	// Create a new address spac. 
 	new_as = as_create();
 	if (new_as == NULL) {
@@ -345,7 +348,7 @@ sys_execv (char* progr, char **args){
 		vfs_close(v_exe);
 		return ENOMEM;
 	}
-kprintf("3");
+
 	// Switch to it and activate it
 	proc_setas(new_as);
 	as_activate();
@@ -373,14 +376,14 @@ kprintf("3");
 	}
 
  //stack is 8 bit aligned
-  stackptr=-padding; //occupied addr space 
+  stackptr-=padding; //occupied addr space 
   //take into account termination
   char **args_addr = (char **) kmalloc(sizeof(char *) * args_counter+1);
   //cp arg to stack and store its adrr
 
 
   for (int i=0;i< args_counter;i++ ) {
-      asize = strlen(args_copy[args_counter]) + 1; //lenght of word+ termiination
+      asize = strlen(args_copy[i]) + 1; //lenght of word+ termiination
       
       //if modulo is not =0, aka is not divisible for 4
       int modul_size=asize % 4;
@@ -390,8 +393,8 @@ kprintf("3");
       stackptr+=asize;
   }
   args_addr[args_counter]=0; //termination
-  stackptr=-padding; //occupied addr space 
-  stackptr=-(args_counter+1)* sizeof(char *); //occupied addr space 
+  stackptr-=padding; //occupied addr space 
+  stackptr-=(args_counter+1)* sizeof(char *); //occupied addr space 
 
 
   //cp addr of addrs into stack
@@ -402,7 +405,7 @@ kprintf("3");
 
   // END PROCESS: FREE COPIESS
   //go to the start of the stack
-  stackptr=-(args_counter+1)* sizeof(char *); 
+  stackptr-=(args_counter+1)* sizeof(char *); 
   kfree(progr_copy);
 
   args_counter_copy = 0;
@@ -418,6 +421,7 @@ kprintf("3");
   //argc,userspace addr of argv,userspace addr of environment...
 	enter_new_process(args_counter,(userptr_t) stackptr, (userptr_t)stackptr , 
 			  stackptr, entrypoint);
+
 
 	// enter_new_process does not return
 	panic("enter_new_process returned\n");

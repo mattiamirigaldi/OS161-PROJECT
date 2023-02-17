@@ -6,7 +6,8 @@
  * This test should itself run correctly when the basic system calls
  * are complete. It may be helpful for scheduler performance analysis.
  */
-
+#include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <err.h>
 
@@ -22,14 +23,18 @@ hog(void)
 	int pid = fork();
 	switch (pid) {
 	    case -1:
-		err(1, "fork");
+				err(1, "fork");
 	    case 0:
-		/* child */
-		execv("/testbin/hog", hargv);
-		err(1, "/testbin/hog");
+				/* child=> pid=0 */
+				
+				printf("pid= %d\n", pid);
+				execv("/testbin/hog", hargv);
+
+				//execv non ritorna
+				err(1, "/testbin/hog");
 	    default:
-		/* parent */
-		pids[npids++] = pid;
+				/* parent */
+				pids[npids++] = pid;
 		break;
 	}
 }

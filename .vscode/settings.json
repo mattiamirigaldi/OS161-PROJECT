@@ -5,6 +5,7 @@
         "fstream": "c",
         "sstream": "c",
         "addrspace.h": "c",
-        "functional": "c"
+        "functional": "c",
+        "vnode.h": "c"
     }
 }

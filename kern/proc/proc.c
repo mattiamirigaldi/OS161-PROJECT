@@ -78,7 +78,10 @@ from_pid_to_proc(pid_t pid){
 		//if(!(pid>=0 && pid<(MAX_PROC+1))) return NULL;
 		if(!(pid>0 && pid<(MAX_PROC+1))) return NULL;
 		//KASSERT(pid>=0 && pid<MAX_PROC);
+		spinlock_acquire(&processTable.lk);
 		pr=processTable.proc[pid];
+		spinlock_release(&processTable.lk);
+		
 		KASSERT(pr->p_pid==pid);
 	return pr;
 	#else
@@ -273,6 +276,7 @@ proc_destroy(struct proc *proc)
 
 	//proc end wait pid
 	proc_end_waitpid(proc); //psem field
+	//sem_destroy(proc->p_semaphore);
 
 	kfree(proc->p_name);
 	kfree(proc);

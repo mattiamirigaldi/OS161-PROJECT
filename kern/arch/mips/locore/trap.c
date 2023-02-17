@@ -377,10 +377,10 @@ mips_usermode(struct trapframe *tf)
 	 */
 	spl0();
 	cpu_irqoff();
-
+	
 	cputhreads[curcpu->c_number] = (vaddr_t)curthread;
 	cpustacks[curcpu->c_number] = (vaddr_t)curthread->t_stack + STACK_SIZE;
-
+	//kprintf("qui arriva\n");
 	/*
 	 * This assertion will fail if either
 	 *   (1) cpustacks[] is corrupted, or
@@ -397,7 +397,8 @@ mips_usermode(struct trapframe *tf)
 	 * (Exercise: why?)
 	 */
 	KASSERT(SAME_STACK(cpustacks[curcpu->c_number]-1, (vaddr_t)tf));
-
+	kprintf("addio\n");
+	//al secondo execv error:same stack
 	/*
 	 * This actually does it. See exception-*.S.
 	 */
@@ -425,15 +426,16 @@ enter_new_process(int argc, userptr_t argv, userptr_t env,
 		  vaddr_t stack, vaddr_t entry)
 {
 	struct trapframe tf;
-
+	kprintf("entered new proc");
 	bzero(&tf, sizeof(tf));
-
+	
 	tf.tf_status = CST_IRQMASK | CST_IEp | CST_KUp;
 	tf.tf_epc = entry;
 	tf.tf_a0 = argc;
 	tf.tf_a1 = (vaddr_t)argv;
 	tf.tf_a2 = (vaddr_t)env;
 	tf.tf_sp = stack;
-
+	
 	mips_usermode(&tf);
+	kprintf("non arriva qui");
 }
