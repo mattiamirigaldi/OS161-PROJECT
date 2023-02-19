@@ -48,10 +48,13 @@ main(int argc, char *argv[])
 {
 	static char writebuf[41] = "Twiddle dee dee, Twiddle dum dum.......\n";
 	static char readbuf[41];
+	static char pathname[1024];
 
 	const char *file;
 	int fd, rv;
 
+	getcwd(pathname, 1024*sizeof(char));
+        printf("Current process directory : %s\n", pathname);
 	if (argc == 0) {
 		warnx("No arguments - running on \"testfile\"");
 		file = "testfile";
@@ -68,27 +71,27 @@ main(int argc, char *argv[])
 		err(1, "%s: open for write", file);
 	}
 
-
+	//printf("done open\n");
 	rv = write(fd, writebuf, 40);
 	if (rv<0) {
 		err(1, "%s: write", file);
 	}
-
+	//printf("done write\n");
 	rv = close(fd);
 	if (rv<0) {
 		err(1, "%s: close (1st time)", file);
 	}
-
+	//printf("done close\n");
 	fd = open(file, O_RDONLY);
 	if (fd<0) {
 		err(1, "%s: open for read", file);
 	}
-
+	//printf("new open\n");
 	rv = read(fd, readbuf, 40);
 	if (rv<0) {
 		err(1, "%s: read", file);
 	}
-	printf("read %s \n", readbuf);
+	//printf("Read %s \n", readbuf);
 	rv = close(fd);
 	if (rv<0) {
 		err(1, "%s: close (2nd time)", file);
@@ -96,7 +99,7 @@ main(int argc, char *argv[])
 	/* ensure null termination */
 	readbuf[40] = 0;
 
-	printf("Written - %s - while read - %s -\n", writebuf, readbuf); 
+	printf("Written : %s \nRead : %s \n", writebuf, readbuf); 
 	if (strcmp(readbuf, writebuf)) {
 		errx(1, "Buffer data mismatch!");
 	}

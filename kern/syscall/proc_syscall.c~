@@ -1,0 +1,103 @@
+#include <types.h>
+#include <clock.h>
+#include <copyinout.h>
+#include <syscall.h>
+#include <addrspace.h>
+#include <thread.h>
+#include <lib.h>
+#include <kern/unistd.h>
+#include <proc.h>
+#include <synch.h>
+#include <current.h>
+#include <kern/errno.h>
+#include <mips/trapframe.h>
+
+void sys__exit(int status)
+{
+  struct proc* p = curproc;
+  curproc->p_status = status & 0xff;
+  // Process destroyed by parent proc after signal the semaphore;
+  // Since thread_destroy kasserts the proc has no more active threads
+  // then removed tread to avoid race conditions
+  proc_remthread(curthread);
+  V(p->p_sem);
+  /* Thread terminated by calling thread_exit() that makes it a zombie
+     but not destroy it so that its status can still be read by another thread 
+  */
+  thread_exit();
+  panic("Thread_exit() should not return\n");
+}
+
+int sys_waitpid (pid_t pid, userptr_t status, int options)
+{
+  int status_to_return;
+  struct proc* proc = proc_search_pid(pid);
+  if (proc == NULL) return -1;
+  status_to_return = proc_wait(proc);
+  if ( status != NULL) *(int*) status = status_to_return;
+  (void) options;
+  return pid;
+}
+
+
+static void child_forkentry(void* child_tf, unsigned long dummy)
+{
+ /* Allocated the child trapframe inside kernel thread stack,
+    otherwise call mips_user_mode() will give error */
+ struct trapframe child_thread_tf = *(struct trapframe*) child_tf;
+ child_thread_tf.tf_a3 = 0; /* a3 stores error code, on success is 0 */
+ child_thread_tf.tf_v0 = 0; /* v0 stores the return value, the child proc returns 0 */
+ child_thread_tf.tf_epc += 4; /* set next instruction the one after fork() call */
+ 
+ as_activate(); /* makes curret addrspace the one seen by processor */
+ mips_usermode(&child_thread_tf); /* returns to user mode */
+ (void) dummy;
+}
+
+pid_t sys_getpid(void)
+{
+  KASSERT(curproc != NULL);
+  return curproc->p_pid;
+}
+
+int sys_fork(struct trapframe* tf, pid_t* retval)
+{
+  struct proc* p_child;
+  struct trapframe* tf_child;
+  int result;
+  KASSERT(curproc != NULL);
+  /* created child proc data structure */
+  p_child = proc_create_runprogram(curproc->p_name);
+  if (p_child == NULL){
+    return ENOMEM;
+  }
+  /* copied the virtual address space of parent */
+  as_copy(curproc->p_addrspace, &(p_child->p_addrspace)); 
+  if (p_child->p_addrspace == NULL){
+    proc_destroy(p_child);
+    return ENOMEM;
+  }
+  /* copied the contex (represented by trapframe) of parent*/
+  tf_child = kmalloc(sizeof(struct trapframe));
+  if (tf_child == NULL){
+    proc_destroy(p_child);
+    return ENOMEM;
+  }
+  tf_child = memcpy(tf_child, tf, sizeof(struct trapframe));
+  /* Created the new kernel thread that will host the child proc,
+     the child proc will execute as first function child_forkentry */
+  result = thread_fork(curthread->t_name,
+		       p_child,
+		       child_forkentry,
+		       (void*) tf_child,
+		       0 );//unused
+  if(result){
+    proc_destroy(p_child);
+    kfree(tf_child);
+    return ENOMEM;
+  }
+  /* parent process returns the child pid */
+  *retval = p_child->p_pid;
+  return 0;		       		      
+}
+

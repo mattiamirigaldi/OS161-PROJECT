@@ -64,7 +64,7 @@ sys_open(userptr_t fpath, int openflags, mode_t mode, int* errp)
     *errp = ENFILE;
     return -1;
   }
-  //fd = proc_file_alloc(fopen); // returns fdtable index
+  //fd = proc_file_alloc(fopen); // returns fdtable index[<0;13;19M
   for(fd=STDERR_FILENO+1; fd<OPEN_MAX; fd++){
     if(curproc->p_fdtable[fd] == NULL){
       curproc->p_fdtable[fd] = fopen;
@@ -102,11 +102,14 @@ sys_close(int fd){
     {
       lock_release(f_toclose->file_lock);
       lock_destroy(f_toclose->file_lock);
+      f_toclose->file_lock=NULL;
       f_toclose->file_v = NULL;
       if (v==NULL) return -1;
       vfs_close(v);
     }
-  lock_release(f_toclose->file_lock);
+  else {
+    lock_release(f_toclose->file_lock);
+  }
   return 0;
 }
 
@@ -161,7 +164,7 @@ sys_write(int fd, userptr_t buf_ptr, size_t buf_length)
 {
   int i = 0;
   char *to_print = (char*) buf_ptr;
-  
+ 
   if (fd != STDOUT_FILENO && fd != STDERR_FILENO){
     return file_write(fd, buf_ptr, buf_length);
   }
@@ -207,6 +210,7 @@ static int file_read(int fd, userptr_t buf_ptr, size_t buf_length)
   }
   of->file_offset = u.uio_offset;
   nread = buf_length - u.uio_resid;
+  lock_release(of->file_lock);
   return(nread);
 }
 
@@ -219,7 +223,6 @@ sys_read(int fd, userptr_t buf_ptr, size_t buf_length)
   
   int i = 0;
   char *to_read = (char*) buf_ptr;
-  // Supported only write to stdout and stderr -> fd constants in unistd.h
   if (fd != STDIN_FILENO){
     return file_read(fd, buf_ptr, buf_length);
   }
@@ -242,6 +245,7 @@ sys_dup2( int oldfd, int newfd, int* errp)
 {
   struct fdesc* f_old;
   int returned = 0;
+  *errp = 0;
   if (oldfd < 0 || oldfd > OPEN_MAX || newfd < 0 || newfd > OPEN_MAX) {
     *errp = EBADF;
     return -1;
