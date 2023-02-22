@@ -35,7 +35,7 @@ enter_forked_process_syscall(void *tf_pass,unsigned long data2){
 	struct trapframe *c_tf = (struct trapframe*) tf_pass; //kernel stack trapframe copy
 	struct trapframe store_tf;
   struct addrspace *c_addr= (struct addrspace*) data2;
-	
+	//curproc->p_pid=c_tf->tf_v0;
 	c_tf->tf_v0=0; //0 return
 	c_tf->tf_a3=0; //success
 	c_tf->tf_epc += 4;

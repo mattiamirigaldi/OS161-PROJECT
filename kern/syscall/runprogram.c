@@ -34,14 +34,18 @@
  */
 
 #include <types.h>
+#include <kern/unistd.h>
 #include <kern/errno.h>
 #include <kern/fcntl.h>
 #include <lib.h>
-#include <proc.h>
 #include <current.h>
 #include <addrspace.h>
+#include <thread.h>
 #include <vm.h>
 #include <vfs.h>
+#include <proc.h>
+#include <copyinout.h>
+#include <current.h>
 #include <syscall.h>
 #include <test.h>
 
@@ -52,12 +56,15 @@
  * Calls vfs_open on progname and thus may destroy it.
  */
 int
-runprogram(char *progname)
+runprogram(char *progname, char** args, int a_size)
 {
 	struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
+	int string_size;
+	size_t actual;
+
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
@@ -96,12 +103,37 @@ runprogram(char *progname)
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;
 	}
+	string_size=0;
+	if(args!=NULL){
+		vaddr_t args_cp[a_size];
+		int to_pad;
 
+		//take into account termination
+		//cp arg to stack and store its adrr
+		for (int i= a_size-1;i>=0;i-- ) {
+			string_size = strlen(args[i]); //lenght of word, no termiination
+			to_pad= ((string_size/4)+1)*sizeof(char *);
+			stackptr-=to_pad;
+			copyoutstr(args[i], (userptr_t)stackptr, string_size+1, &actual);
+			args_cp[i]=stackptr;
+		}
+		args_cp[a_size]=0; //termination
+
+		//cp addr of addrs into stack: pointers of string
+		for (int i= a_size-1;i>=0;i-- ) {
+				stackptr-=sizeof(char *);
+				copyout(&(args_cp[i]), (userptr_t)stackptr, sizeof(char *));
+				}
+
+		/* Warp to user mode. */
+	enter_new_process(a_size, (userptr_t) stackptr, (userptr_t) stackptr, stackptr, entrypoint);
+	}
+	else{
 	/* Warp to user mode. */
 	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
-
+	}
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");
 	return EINVAL;
